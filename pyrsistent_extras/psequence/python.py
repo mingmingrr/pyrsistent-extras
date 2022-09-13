@@ -72,7 +72,7 @@ class PSequence(PSequenceBase):
 		if len(self._items) == 1:
 			return PSequence._deep(self._size + item._size,
 				PSequence._digit(self._size, self._items[0]),
-				_EMPTY_SEQUENCE,
+				EMPTY_SEQUENCE,
 				PSequence._digit(item._size, item))
 		left, middle, right = self._items
 		if len(right._items) < 4:
@@ -95,7 +95,7 @@ class PSequence(PSequenceBase):
 		if len(self._items) == 1:
 			return PSequence._deep(self._size + item._size,
 				PSequence._digit(item._size, item),
-				_EMPTY_SEQUENCE,
+				EMPTY_SEQUENCE,
 				PSequence._digit(self._size, self._items[0]))
 		left, middle, right = self._items
 		if len(left._items) < 4:
@@ -135,7 +135,7 @@ class PSequence(PSequenceBase):
 
 	def _viewright(self):
 		if len(self._items) == 1:
-			return _EMPTY_SEQUENCE, self._items[0]
+			return EMPTY_SEQUENCE, self._items[0]
 		left, middle, right = self._items
 		*init, last = right._items
 		if not init: return middle._pullright(left), last
@@ -158,7 +158,7 @@ class PSequence(PSequenceBase):
 
 	def _viewleft(self):
 		if len(self._items) == 1:
-			return self._items[0], _EMPTY_SEQUENCE
+			return self._items[0], EMPTY_SEQUENCE
 		left, middle, right = self._items
 		head, *tail = left._items
 		if not tail: return head, middle._pullleft(right)
@@ -201,9 +201,9 @@ class PSequence(PSequenceBase):
 
 	def _splitview(self, index):
 		if len(self._items) == 1:
-			return _EMPTY_SEQUENCE, \
+			return EMPTY_SEQUENCE, \
 				self._items[0], \
-				_EMPTY_SEQUENCE
+				EMPTY_SEQUENCE
 		left, middle, right = self._items
 		if index < left._size:
 			mid, item, sizeL, itemsL, sizeR, itemsR = left._splitindex(index)
@@ -231,20 +231,20 @@ class PSequence(PSequenceBase):
 	def splitat(self, index):
 		try: index = self._checkindex(index)
 		except IndexError:
-			if index < 0: return _EMPTY_SEQUENCE, self
-			return self, _EMPTY_SEQUENCE
+			if index < 0: return EMPTY_SEQUENCE, self
+			return self, EMPTY_SEQUENCE
 		left, mid, right = self._splitview(index)
 		return left, right._appendleft(mid)
 
 	@staticmethod
 	def _fromnodes(size, nodes):
-		if len(nodes) == 0: return _EMPTY_SEQUENCE
+		if len(nodes) == 0: return EMPTY_SEQUENCE
 		if len(nodes) == 1: return PSequence._single(nodes[0])
 		if len(nodes) <= 8:
 			mid = len(nodes) // 2
 			return PSequence._deep(size,
 				PSequence._digitS(*nodes[:mid]),
-				_EMPTY_SEQUENCE,
+				EMPTY_SEQUENCE,
 				PSequence._digitS(*nodes[mid:]))
 		left = PSequence._digitS(*nodes[:3])
 		right = PSequence._digitS(*nodes[-3:])
@@ -261,7 +261,7 @@ class PSequence(PSequenceBase):
 
 	def _takeleft(self, index):
 		if len(self._items) == 1:
-			return self._items[0], _EMPTY_SEQUENCE
+			return self._items[0], EMPTY_SEQUENCE
 		left, middle, right = self._items
 		if index < left._size:
 			mid, item, sizeL, itemsL, sizeR, itemsR = left._splitindex(index)
@@ -280,13 +280,13 @@ class PSequence(PSequenceBase):
 			PSequence._digit(sizeL, *itemsL))
 
 	def _takeL(self, count):
-		if count <= 0: return _EMPTY_SEQUENCE
+		if count <= 0: return EMPTY_SEQUENCE
 		if count >= self._size: return self
 		return self._takeleft(count)[1]
 
 	def _takeright(self, index):
 		if len(self._items) == 1:
-			return self._items[0], _EMPTY_SEQUENCE
+			return self._items[0], EMPTY_SEQUENCE
 		left, middle, right = self._items
 		if index < right._size:
 			mid, item, sizeL, itemsL, sizeR, itemsR = \
@@ -309,7 +309,7 @@ class PSequence(PSequenceBase):
 			PSequence._digit(sizeR, *itemsR), middle, right)
 
 	def _takeR(self, count):
-		if count <= 0: return _EMPTY_SEQUENCE
+		if count <= 0: return EMPTY_SEQUENCE
 		if count >= self._size: return self
 		return self._takeright(count)[1]
 
@@ -386,7 +386,7 @@ class PSequence(PSequenceBase):
 	def __getitem__(self, index):
 		if isinstance(index, slice):
 			start, stop, step, count = PSequence._sliceindices(index, self._size)
-			if count <= 0: return _EMPTY_SEQUENCE
+			if count <= 0: return EMPTY_SEQUENCE
 			if step < 0: start, stop = start + (count - 1) * step, start + 1
 			if abs(step) == 1:
 				tree = self
@@ -522,7 +522,7 @@ class PSequence(PSequenceBase):
 		meld = tuple() if meld is None else (meld,)
 		if len(right._items) < 4:
 			return True, PSequence._deep(size, left,
-				_EMPTY_SEQUENCE,
+				EMPTY_SEQUENCE,
 				PSequence._digitS(*meld, *right._items))
 		return True, PSequence._deep(size, left,
 			PSequence._single(PSequence._nodeS(*meld, *right._items[:2])),
@@ -546,7 +546,7 @@ class PSequence(PSequenceBase):
 			return self._deleteslice(start, stop, step, count)
 		index = self._checkindex(index)
 		full, meld = self._deleteitem(index)
-		if not full: return _EMPTY_SEQUENCE
+		if not full: return EMPTY_SEQUENCE
 		return meld
 
 	def _insert(self, index, value):
@@ -566,7 +566,7 @@ class PSequence(PSequenceBase):
 		if len(self._items) == 1:
 			return PSequence._deep(size,
 				PSequence._digitS(meld),
-				_EMPTY_SEQUENCE,
+				EMPTY_SEQUENCE,
 				PSequence._digitS(extra)), None
 		left, middle, right = self._items
 		if mid == 0: return PSequence._deep(size,
@@ -631,8 +631,8 @@ class PSequence(PSequenceBase):
 		return tuple(self.tolist())
 
 	def __mul__(self, times):
-		if times <= 0: return _EMPTY_SEQUENCE
-		acc, exp = _EMPTY_SEQUENCE, self
+		if times <= 0: return EMPTY_SEQUENCE
+		acc, exp = EMPTY_SEQUENCE, self
 		while times != 0:
 			if times % 2 == 1:
 				acc += exp
@@ -745,7 +745,7 @@ class Evolver(PSequenceEvolverBase):
 	evolver = copy
 
 	def clear(self):
-		self._seq = _EMPTY_SEQUENCE
+		self._seq = EMPTY_SEQUENCE
 
 	def __iadd__(self, other):
 		self._seq = self._seq + other
@@ -796,9 +796,9 @@ class Evolver(PSequenceEvolverBase):
 	__setitem__ = set
 	__delitem__ = delete # type: ignore
 
-_EMPTY_SEQUENCE = PSequence(PSequence._Type.Tree, 0, tuple())
+EMPTY_SEQUENCE = PSequence(PSequence._Type.Tree, 0, tuple())
 
-def psequence(iterable=_EMPTY_SEQUENCE):
+def psequence(iterable=EMPTY_SEQUENCE):
 	if isinstance(iterable, Evolver): return iterable._seq
 	if isinstance(iterable, PSequence): return iterable
 	nodes = [PSequence._node1(i) for i in iterable]
