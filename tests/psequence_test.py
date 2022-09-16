@@ -1,4 +1,4 @@
-from pyrsistent_extras import psequence, PSequence, sq
+from pyrsistent_extras.psequence import psequence, PSequence, sq
 
 import hypothesis
 from hypothesis import given, strategies as st
@@ -10,13 +10,12 @@ import inspect
 import typing
 import gc
 
-hypothesis.settings.register_profile('proof', max_examples=2000)
-#  hypothesis.settings.load_profile('proof')
-
 # {{{ strategies
 
 class RefInt(int):
-	"integer type that tracks garbage collection"
+	'''
+	integer type that tracks garbage collection
+	'''
 	count = 0
 	def __new__(cls, *args, **kwargs):
 		RefInt.count += 1
@@ -29,7 +28,9 @@ IndexSeq = object()
 
 @functools.lru_cache(maxsize=None)
 def fingernodes(elements, depth):
-	"generate a Node"
+	'''
+	generate a Node
+	'''
 	if depth <= 0: return st.builds(lambda x: ('Node', 1, x), elements)
 	node = fingernodes(elements, depth-1)
 	return st.builds(lambda xs: ('Node', sum(x[1] for x in xs), *xs),
@@ -37,14 +38,18 @@ def fingernodes(elements, depth):
 
 @functools.lru_cache(maxsize=None)
 def fingerdigits(elements, depth):
-	"generate a Digit"
+	'''
+	generate a Digit
+	'''
 	node = fingernodes(elements, depth)
 	return st.builds(lambda xs: ('Digit', sum(x[1] for x in xs), *xs),
 		st.lists(node, min_size=1, max_size=4))
 
 @functools.lru_cache(maxsize=None)
 def fingertrees(elements, depth, max_depth):
-	"generate a Tree"
+	'''
+	generate a Tree
+	'''
 	if depth >= max_depth: return st.just(('Tree', 0))
 	node = fingernodes(elements, depth)
 	digit = fingerdigits(elements, depth)
@@ -53,15 +58,18 @@ def fingertrees(elements, depth, max_depth):
 		st.builds(lambda l, m, r: ('Tree', l[1] + m[1] + r[1], l, m, r),
 			digit, tree, digit))
 
-def psequences(elements=st.integers(), max_depth=None):
-	"generate a PSequence as its tuple representation"
-	if max_depth is None: max_depth = 4
+def psequences(elements=st.integers(), max_depth=4):
+	'''
+	generate a PSequence as its tuple representation
+	'''
 	return st.one_of(fingertrees(elements, 0, depth)
 		for depth in range(max_depth + 1))
 
 @st.composite
 def indexseqs(draw, count=1, scale=2, *args, **kwargs):
-	"generate an int-PSequence pair"
+	'''
+	generate an int-PSequence pair
+	'''
 	seq = draw(psequences(*args, **kwargs))
 	length = seq[1]
 	ns = draw(st.lists(st.integers(
@@ -73,8 +81,54 @@ def indexseqs(draw, count=1, scale=2, *args, **kwargs):
 
 # {{{ checkers
 
+def check_items(size, acc, *items):
+	sizes = []
+	for item in items:
+		sizes.append(check_tree(*item, acc))
+	assert sum(sizes) == size
+
+def check_tree(tree, depth, acc):
+	assert type(tree) is tuple
+	ftype, size, *items = tree
+	if ftype == 'Node':
+		if len(items) == 1:
+			assert size == 1
+			assert depth == 0
+			acc.append(items[0])
+		else:
+			assert len(items) in (2, 3)
+			check_items(size, acc, *((item, depth - 1) for item in items))
+	elif ftype == 'Digit':
+		assert len(items) in (1, 2, 3, 4)
+		check_items(size, acc, *((item, depth) for item in items))
+	elif ftype == 'Tree':
+		if len(items) == 0:
+			assert size == 0
+		elif len(items) == 1:
+			check_items(size, acc, (items[0], depth))
+		elif len(items) == 3:
+			check_items(size, acc, (items[0], depth),
+				(items[1], depth + 1), (items[2], depth))
+		else: assert False
+	else: assert False
+	return size
+
+def check_seq(seq):
+	'''
+	check invariants of PSequence while converting it to a list
+	'''
+	acc = []
+	check_tree(seq._totree(), 0, acc)
+	return acc
+
+# }}}
+
+# {{{ decorators
+
 def iter_tree(tree):
-	"flatten tree representation of PSequence"
+	'''
+	flatten tree representation of PSequence
+	'''
 	ftype, size, *items = tree
 	if size == 1 and ftype == 'Node':
 		yield items[0]
@@ -82,51 +136,11 @@ def iter_tree(tree):
 		for item in items:
 			yield from iter_tree(item)
 
-def check_tree(tree, depth=0):
-	"check invariants of PSequence"
-	if hasattr(tree, '_totree'):
-		tree = tree._totree()
-		check_tree(tree, depth)
-		return list(iter_tree(tree))
-	assert type(tree) is tuple
-	ftype, size, *items = tree
-	if ftype == 'Node':
-		if len(items) == 1:
-			assert size == 1
-			assert depth == 0
-		else:
-			assert len(items) in (2, 3)
-			assert size == sum(check_tree(item, depth - 1) for item in items)
-	elif ftype == 'Digit':
-		assert len(items) in (1, 2, 3, 4)
-		assert size == sum(check_tree(item, depth) for item in items)
-	elif ftype == 'Tree':
-		if len(items) == 0:
-			assert size == 0
-		elif len(items) == 1:
-			assert size == check_tree(items[0], depth)
-		elif len(items) == 3:
-			assert size == check_tree(items[0], depth) \
-				+ check_tree(items[1], depth + 1) \
-				+ check_tree(items[2], depth)
-		else: assert False
-	else: assert False
-	return size
-
-# }}}
-
-# {{{ decorators
-
 def with_list(items):
-	"track gc for list"
+	'''
+	track gc for list
+	'''
 	return [RefInt(item) for item in items]
-
-def with_psequence(tree):
-	"track gc for PSequence"
-	tree = with_fingertree(tree)
-	items = list(iter_tree(tree))
-	tree = PSequence._fromtree(tree)
-	return tree, items
 
 def with_fingertree(tree):
 	ftype, size, *items = tree
@@ -134,8 +148,19 @@ def with_fingertree(tree):
 		return ftype, size, RefInt(items[0])
 	return (ftype, size, *map(with_fingertree, items))
 
-def with_reflists(func):
-	"track gc based on function's type signature"
+def with_psequence(tree):
+	'''
+	track gc for PSequence
+	'''
+	tree = with_fingertree(tree)
+	items = list(iter_tree(tree))
+	tree = PSequence._fromtree(tree)
+	return tree, items
+
+def check_garbage(func):
+	'''
+	check all garbage is collected properly
+	'''
 	types = {k: {
 		int: RefInt,
 		list: with_list,
@@ -144,19 +169,11 @@ def with_reflists(func):
 	}.get(v, lambda x: x) for k, v in typing.get_type_hints(func).items()}
 	@functools.wraps(func)
 	def inner(*args, **kwargs):
-		kwargs = inspect.getcallargs(func, *args, **kwargs)
-		return func(**{k: types.get(k, lambda x: x)(v) for k, v in kwargs.items()})
-	inner.__signature__ = inspect.signature(func)
-	return inner
-
-def check_garbage(func):
-	"check all garbage is collected properly"
-	@functools.wraps(func)
-	def inner(*args, **kwargs):
-		gc.collect(1)
+		gc.collect(0)
 		int0, ref0 = RefInt.count, PSequence._refcount()
-		result = func(*args, **kwargs)
-		gc.collect(1)
+		kwargs = inspect.getcallargs(func, *args, **kwargs)
+		result =  func(**{k: types[k](v) for k, v in kwargs.items()})
+		gc.collect(0)
 		assert PSequence._refcount() == ref0, 'tree ref count'
 		assert RefInt.count == int0, 'int ref count'
 		return result
@@ -169,7 +186,6 @@ def check_garbage(func):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_types(seqitems:PSequence):
 	seq, items = seqitems
 	assert isinstance(seq, PSequence)
@@ -178,56 +194,48 @@ def test_types(seqitems:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_bool(seqitems:PSequence):
 	seq, items = seqitems
 	assert bool(seq) == bool(items)
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_length(seqitems:PSequence):
 	seq, items = seqitems
 	assert len(seq) == len(items)
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_tolist(seqitems:PSequence):
 	seq, items = seqitems
 	assert seq.tolist() == items
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_totuple(seqitems:PSequence):
 	seq, items = seqitems
 	assert seq.totuple() == tuple(items)
 
 @given(st.lists(st.integers()))
 @check_garbage
-@with_reflists
 def test_fromlist(items:list):
-	assert check_tree(psequence(items)) == items
+	assert check_seq(psequence(items)) == items
 
 @given(st.lists(st.integers()))
 @check_garbage
-@with_reflists
 def test_sq(items:list):
-	assert check_tree(sq(*items)) == items
+	assert check_seq(sq(*items)) == items
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_repr(seqitems:PSequence):
 	seq, items = seqitems
 	r = repr(seq)
 	assert r.startswith('psequence')
-	assert check_tree(eval(r)) == items
+	assert check_seq(eval(r)) == items
 
 @given(psequences(), psequences())
 @check_garbage
-@with_reflists
 def test_compare(seqitems1:PSequence, seqitems2:PSequence):
 	seq1, items1 = seqitems1 ; seq2, items2 = seqitems2
 	assert seq1 == seq1 ; assert seq2 == seq2
@@ -240,56 +248,52 @@ def test_compare(seqitems1:PSequence, seqitems2:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_viewleft(seqitems:PSequence):
 	seq, items = seqitems
 	if items:
 		head, tail = seq.viewleft()
 		assert head == items[0]
-		assert check_tree(tail) == items[1:]
+		assert check_seq(tail) == items[1:]
 	else:
 		with pytest.raises(IndexError):
 			seq.viewleft()
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_viewright(seqitems:PSequence):
 	seq, items = seqitems
 	if items:
 		init, last = seq.viewright()
 		assert last == items[-1]
-		assert check_tree(init) == items[:-1]
+		assert check_seq(init) == items[:-1]
 	else:
 		with pytest.raises(IndexError):
 			seq.viewright()
 
 @given(indexseqs(count=2, scale=1))
 @check_garbage
-@with_reflists
 def test_view(iseqitems:IndexSeq):
 	n1, n2, seq, items = iseqitems
 	if items:
 		m1, m2 = n1 % len(items), n2 % len(items)
 		left, item, right = seq.view(n1)
-		assert check_tree(left) == items[:m1]
+		assert check_seq(left) == items[:m1]
 		assert item == items[m1]
-		assert check_tree(right) == items[m1+1:]
+		assert check_seq(right) == items[m1+1:]
 		if m1 != m2:
 			if m1 > m2: n1, n2, m1, m2 = n2, n1, m2, m1
 			left, item1, mid, item2, right = seq.view(n1, n2)
-			assert check_tree(left) == items[:m1]
+			assert check_seq(left) == items[:m1]
 			assert item1 == items[m1]
-			assert check_tree(mid) == items[m1+1:m2]
+			assert check_seq(mid) == items[m1+1:m2]
 			assert item2 == items[m2]
-			assert check_tree(right) == items[m2+1:]
+			assert check_seq(right) == items[m2+1:]
 	else:
 		with pytest.raises(IndexError):
 			seq.view(0)
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_peekleft(seqitems:PSequence):
 	seq, items = seqitems
 	if items:
@@ -300,7 +304,6 @@ def test_peekleft(seqitems:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_peekright(seqitems:PSequence):
 	seq, items = seqitems
 	if items:
@@ -311,60 +314,53 @@ def test_peekright(seqitems:PSequence):
 
 @given(st.integers(), psequences())
 @check_garbage
-@with_reflists
 def test_appendleft(item:int, seqitems:PSequence):
 	seq, items = seqitems
-	assert check_tree(seq.appendleft(item)) == [item] + items
+	assert check_seq(seq.appendleft(item)) == [item] + items
 
 @given(st.integers(), psequences())
 @check_garbage
-@with_reflists
 def test_appendright(item:int, seqitems:PSequence):
 	seq, items = seqitems
 	expect = items + [item]
-	assert check_tree(seq.append(item)) == expect
-	assert check_tree(seq.appendright(item)) == expect
+	assert check_seq(seq.append(item)) == expect
+	assert check_seq(seq.appendright(item)) == expect
 
 @given(psequences(), psequences())
 @check_garbage
-@with_reflists
 def test_extendleft(seqitems1:PSequence, seqitems2:PSequence):
 	seq1, items1 = seqitems1
 	seq2, items2 = seqitems2
 	expect = items2 + items1
-	assert check_tree(seq1.extendleft(seq2)) == expect
-	assert check_tree(seq1.extendleft(items2)) == expect
+	assert check_seq(seq1.extendleft(seq2)) == expect
+	assert check_seq(seq1.extendleft(items2)) == expect
 
 @given(psequences(), psequences())
 @check_garbage
-@with_reflists
 def test_extendright(seqitems1:PSequence, seqitems2:PSequence):
 	seq1, items1 = seqitems1
 	seq2, items2 = seqitems2
-	expecexpect items1 + items2
-	assert check_tree(seq1.extend(seq2)) == expect
-	assert check_tree(seq1.extendright(seq2)) == expect
-	assert check_tree(seq1.extendright(items2)) == expect
-	assert check_tree(seq1 + seq2) == expect
+	expect = items1 + items2
+	assert check_seq(seq1.extend(seq2)) == expect
+	assert check_seq(seq1.extendright(seq2)) == expect
+	assert check_seq(seq1.extendright(items2)) == expect
+	assert check_seq(seq1 + seq2) == expect
 
 @given(psequences(max_depth=2), st.integers(-20, 100))
 @hypothesis.settings(deadline=None)
 @check_garbage
-@with_reflists
 def test_repeat(seqitems:PSequence, times:int):
 	seq, items = seqitems
-	assert check_tree(seq * times) == items * times
+	assert check_seq(seq * times) == items * times
 
 @given(psequences(elements=st.integers(0, 100)), st.integers(0, 100))
 @check_garbage
-@with_reflists
 def test_contains(seqitems:PSequence, item:int):
 	seq, items = seqitems
 	assert (item in seq) == (item in items)
 
 @given(psequences(elements=st.integers(0, 20)), st.integers(0, 20))
 @check_garbage
-@with_reflists
 def test_index(seqitems:PSequence, item:int):
 	seq, items = seqitems
 	if item in items:
@@ -375,34 +371,30 @@ def test_index(seqitems:PSequence, item:int):
 
 @given(psequences(elements=st.integers(0, 20)), st.integers(0, 20))
 @check_garbage
-@with_reflists
 def test_remove(seqitems:PSequence, item:int):
 	seq, items = seqitems
 	if item in items:
 		copy = items[:] ; copy.remove(item)
-		assert check_tree(seq.remove(item)) == copy
+		assert check_seq(seq.remove(item)) == copy
 	else:
 		with pytest.raises(ValueError):
 			seq.remove(item)
 
 @given(psequences(elements=st.integers(0, 10)), st.integers(0, 10))
 @check_garbage
-@with_reflists
 def test_count(seqitems:PSequence, item:int):
 	seq, items = seqitems
 	assert seq.count(item) == items.count(item)
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_sort(seqitems:PSequence):
 	seq, items = seqitems
-	assert check_tree(seq.sort()) == sorted(items)
-	assert check_tree(seq) == items
+	assert check_seq(seq.sort()) == sorted(items)
+	assert check_seq(seq) == items
 
 @given(indexseqs())
 @check_garbage
-@with_reflists
 def test_get(iseqitems:IndexSeq):
 	index, seq, items = iseqitems
 	if -len(items) <= index < len(items):
@@ -413,65 +405,60 @@ def test_get(iseqitems:IndexSeq):
 
 @given(indexseqs(), st.integers())
 @check_garbage
-@with_reflists
 def test_set_single(iseqitems:IndexSeq, item:int):
 	index, seq, items = iseqitems
 	if -len(items) <= index < len(items):
 		copy = items[:] ; copy[index] = item
-		assert check_tree(seq.set(index, item)) == copy
+		assert check_seq(seq.set(index, item)) == copy
 	else:
 		with pytest.raises(IndexError):
 			seq.set(index, item)
 
 @given(indexseqs(count=2), st.lists(st.integers()))
 @check_garbage
-@with_reflists
 def test_set_slice(iseqitems:IndexSeq, update:list):
 	start, stop, seq, items = iseqitems
 	copy = items[:] ; copy[start:] = update
-	assert check_tree(seq.set(slice(start, None), update)) == copy
+	assert check_seq(seq.set(slice(start, None), update)) == copy
 	copy = items[:] ; copy[:stop] = update
-	assert check_tree(seq.set(slice(None, stop), update)) == copy
+	assert check_seq(seq.set(slice(None, stop), update)) == copy
 	copy = items[:] ; copy[start:stop] = update
-	assert check_tree(seq.set(slice(start, stop), update)) == copy
+	assert check_seq(seq.set(slice(start, stop), update)) == copy
 
 @given(indexseqs(count=2))
 @check_garbage
-@with_reflists
 def test_set_slice_reversed(iseqitems:IndexSeq):
 	start, stop, seq, items = iseqitems
 	update = [RefInt(1 - 2 * x) for x in items[start::-1]]
 	copy = items[:] ; copy[start::-1] = update
-	assert check_tree(seq.set(slice(start, None, -1), update)) == copy
+	assert check_seq(seq.set(slice(start, None, -1), update)) == copy
 	update = [RefInt(1 - 2 * x) for x in items[:stop:-1]]
 	copy = items[:] ; copy[:stop:-1] = update
-	assert check_tree(seq.set(slice(None, stop, -1), update)) == copy
+	assert check_seq(seq.set(slice(None, stop, -1), update)) == copy
 	update = [RefInt(1 - 2 * x) for x in items[start:stop:-1]]
 	copy = items[:] ; copy[start:stop:-1] = update
-	assert check_tree(seq.set(slice(start, stop, -1), update)) == copy
+	assert check_seq(seq.set(slice(start, stop, -1), update)) == copy
 
 @given(indexseqs(count=3))
 @check_garbage
-@with_reflists
 def test_set_slice_step(iseqitems:IndexSeq):
 	start, stop, step, seq, items = iseqitems
 	hypothesis.assume(step != 0)
 	update = [RefInt(1 - 2 * x) for x in items[::step]]
 	copy = items[:] ; copy[::step] = update
-	assert check_tree(seq.set(slice(None, None, step), update)) == copy
+	assert check_seq(seq.set(slice(None, None, step), update)) == copy
 	update = [RefInt(1 - 2 * x) for x in items[start::step]]
 	copy = items[:] ; copy[start::step] = update
-	assert check_tree(seq.set(slice(start, None, step), update)) == copy
+	assert check_seq(seq.set(slice(start, None, step), update)) == copy
 	update = [RefInt(1 - 2 * x) for x in items[:stop:step]]
 	copy = items[:] ; copy[:stop:step] = update
-	assert check_tree(seq.set(slice(None, stop, step), update)) == copy
+	assert check_seq(seq.set(slice(None, stop, step), update)) == copy
 	update = [RefInt(1 - 2 * x) for x in items[start:stop:step]]
 	copy = items[:] ; copy[start:stop:step] = update
-	assert check_tree(seq.set(slice(start, stop, step), update)) == copy
+	assert check_seq(seq.set(slice(start, stop, step), update)) == copy
 
 @given(psequences(), st.lists(st.integers()))
 @check_garbage
-@with_reflists
 def test_mset(seqitems:PSequence, updates:list):
 	seq, items = seqitems
 	hypothesis.assume(len(items) > 0)
@@ -483,92 +470,84 @@ def test_mset(seqitems:PSequence, updates:list):
 		idx, val = updates[i], updates[i + 1]
 		copy[idx] = val
 		sets.append((idx, val))
-	assert check_tree(seq.mset(*updates)) == copy
-	assert check_tree(seq.mset(*sets)) == copy
+	assert check_seq(seq.mset(*updates)) == copy
+	assert check_seq(seq.mset(*sets)) == copy
 
 @given(indexseqs(), st.integers())
 @check_garbage
-@with_reflists
 def test_insert(iseqitems:IndexSeq, item:int):
 	index, seq, items = iseqitems
 	copy = items[:] ; copy.insert(index, item)
-	assert check_tree(seq.insert(index, item)) == copy
+	assert check_seq(seq.insert(index, item)) == copy
 
 @given(indexseqs())
 @check_garbage
-@with_reflists
 def test_delete_single(iseqitems:IndexSeq):
 	index, seq, items = iseqitems
 	if -len(items) <= index < len(items):
 		copy = items[:] ; del copy[index]
-		assert check_tree(seq.delete(index)) == copy
+		assert check_seq(seq.delete(index)) == copy
 	else:
 		with pytest.raises(IndexError):
 			seq.delete(index)
 
 @given(indexseqs(count=2))
 @check_garbage
-@with_reflists
 def test_delete_slice(iseqitems:IndexSeq):
 	start, stop, seq, items = iseqitems
 	copy = items[:] ; del copy[start:]
-	assert check_tree(seq.delete(slice(start, None))) == copy
+	assert check_seq(seq.delete(slice(start, None))) == copy
 	copy = items[:] ; del copy[:stop]
-	assert check_tree(seq.delete(slice(None, stop))) == copy
+	assert check_seq(seq.delete(slice(None, stop))) == copy
 	copy = items[:] ; del copy[start:stop]
-	assert check_tree(seq.delete(slice(start, stop))) == copy
+	assert check_seq(seq.delete(slice(start, stop))) == copy
 
 @given(indexseqs(count=2))
 @check_garbage
-@with_reflists
 def test_delete_slice_reversed(iseqitems:IndexSeq):
 	start, stop, seq, items = iseqitems
 	copy = items[:] ; del copy[start::-1]
-	assert check_tree(seq.delete(slice(start, None, -1))) == copy
+	assert check_seq(seq.delete(slice(start, None, -1))) == copy
 	copy = items[:] ; del copy[:stop:-1]
-	assert check_tree(seq.delete(slice(None, stop, -1))) == copy
+	assert check_seq(seq.delete(slice(None, stop, -1))) == copy
 	copy = items[:] ; del copy[start:stop:-1]
-	assert check_tree(seq.delete(slice(start, stop, -1))) == copy
+	assert check_seq(seq.delete(slice(start, stop, -1))) == copy
 
 @given(indexseqs(count=3))
 @check_garbage
-@with_reflists
 def test_delete_slice_step(iseqitems:IndexSeq):
 	start, stop, step, seq, items = iseqitems
 	hypothesis.assume(step != 0)
 	copy = items[:] ; del copy[::step]
-	assert check_tree(seq.delete(slice(None, None, step))) == copy
+	assert check_seq(seq.delete(slice(None, None, step))) == copy
 	copy = items[:] ; del copy[start::step]
-	assert check_tree(seq.delete(slice(start, None, step))) == copy
+	assert check_seq(seq.delete(slice(start, None, step))) == copy
 	copy = items[:] ; del copy[:stop:step]
-	assert check_tree(seq.delete(slice(None, stop, step))) == copy
+	assert check_seq(seq.delete(slice(None, stop, step))) == copy
 	copy = items[:] ; del copy[start:stop:step]
-	assert check_tree(seq.delete(slice(start, stop, step))) == copy
+	assert check_seq(seq.delete(slice(start, stop, step))) == copy
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_reverse(seqitems:PSequence):
 	seq, items = seqitems
-	assert check_tree(seq.reverse()) == items[::-1]
+	assert check_seq(seq.reverse()) == items[::-1]
 
 @given(indexseqs())
 @check_garbage
-@with_reflists
 def test_splitat(iseqitems:IndexSeq):
 	index, seq, items = iseqitems
 	left, right = seq.splitat(index)
-	assert check_tree(left) == items[:index]
-	assert check_tree(right) == items[index:]
+	assert check_seq(left) == items[:index]
+	assert check_seq(right) == items[index:]
 
 @given(indexseqs())
 @check_garbage
-@with_reflists
 def test_chunksof(iseqitems:IndexSeq):
 	chunk, seq, items = iseqitems
 	chunk = chunk % max(1, len(items)) + 1
-	subseqs = check_tree(seq.chunksof(chunk))
-	subseqs = [tuple(check_tree(s)) for s in subseqs]
+	subseqs = check_seq(seq.chunksof(chunk))
+	subseqs = [tuple(check_seq(s)) for s in subseqs]
 	expect = list(zip(*([iter(items)] * chunk)))
 	rest = items[len(items) - len(items) % chunk:]
 	if rest: expect.append(tuple(rest))
@@ -576,43 +555,38 @@ def test_chunksof(iseqitems:IndexSeq):
 
 @given(indexseqs(count=2))
 @check_garbage
-@with_reflists
 def test_slice(iseqitems:IndexSeq):
 	start, stop, seq, items = iseqitems
-	assert check_tree(seq[start:]) == items[start:]
-	assert check_tree(seq[:stop]) == items[:stop]
-	assert check_tree(seq[start:stop]) == items[start:stop]
+	assert check_seq(seq[start:]) == items[start:]
+	assert check_seq(seq[:stop]) == items[:stop]
+	assert check_seq(seq[start:stop]) == items[start:stop]
 
 @given(indexseqs(count=2))
 @check_garbage
-@with_reflists
 def test_slice_reversed(iseqitems:IndexSeq):
 	start, stop, seq, items = iseqitems
-	assert check_tree(seq[start::-1]) == items[start::-1]
-	assert check_tree(seq[:stop:-1]) == items[:stop:-1]
-	assert check_tree(seq[start:stop:-1]) == items[start:stop:-1]
+	assert check_seq(seq[start::-1]) == items[start::-1]
+	assert check_seq(seq[:stop:-1]) == items[:stop:-1]
+	assert check_seq(seq[start:stop:-1]) == items[start:stop:-1]
 
 @given(indexseqs(count=3))
 @check_garbage
-@with_reflists
 def test_slice_step(iseqitems:IndexSeq):
 	start, stop, step, seq, items = iseqitems
 	hypothesis.assume(step != 0)
-	assert check_tree(seq[::step]) == items[::step]
-	assert check_tree(seq[start::step]) == items[start::step]
-	assert check_tree(seq[:stop:step]) == items[:stop:step]
-	assert check_tree(seq[start:stop:step]) == items[start:stop:step]
+	assert check_seq(seq[::step]) == items[::step]
+	assert check_seq(seq[start::step]) == items[start::step]
+	assert check_seq(seq[:stop:step]) == items[:stop:step]
+	assert check_seq(seq[start:stop:step]) == items[start:stop:step]
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_reduce(seqitems:PSequence):
 	seq, items = seqitems
-	assert check_tree(pickle.loads(pickle.dumps(seq))) == items
+	assert check_seq(pickle.loads(pickle.dumps(seq))) == items
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_hash(seqitems:PSequence):
 	seq, items = seqitems
 	assert hash(seq) == hash(psequence(items))
@@ -623,7 +597,6 @@ def test_hash(seqitems:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_iter(seqitems:PSequence):
 	seq, items = seqitems
 	iseq = iter(seq)
@@ -635,7 +608,6 @@ def test_iter(seqitems:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_reversed(seqitems:PSequence):
 	seq, items = seqitems
 	iseq = reversed(seq)
@@ -651,15 +623,13 @@ def test_reversed(seqitems:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
-	assert check_tree(evo.persistent()) == check_tree(seq)
+	assert check_seq(evo.persistent()) == check_seq(seq)
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_bool(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
@@ -667,7 +637,6 @@ def test_evolver_bool(seqitems:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_length(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
@@ -675,7 +644,6 @@ def test_evolver_length(seqitems:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_tolist(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
@@ -683,7 +651,6 @@ def test_evolver_tolist(seqitems:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_totuple(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
@@ -691,17 +658,15 @@ def test_evolver_totuple(seqitems:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_repr(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
 	r = repr(evo)
 	assert r.startswith('psequence')
-	assert check_tree(eval(r)) == items
+	assert check_seq(eval(r)) == items
 
 @given(psequences(), psequences())
 @check_garbage
-@with_reflists
 def test_evolver_compare(seqitems1:PSequence, seqitems2:PSequence):
 	seq1, items1 = seqitems1 ; seq2, items2 = seqitems2
 	evo1 = seq1.evolver() ; evo2 = seq2.evolver()
@@ -722,61 +687,57 @@ def test_evolver_compare(seqitems1:PSequence, seqitems2:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_viewleft(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
 	if items:
 		head, tail = evo.viewleft()
 		assert head == items[0]
-		assert check_tree(tail) == items[1:]
-		assert check_tree(evo) == items
+		assert check_seq(tail) == items[1:]
+		assert check_seq(evo) == items
 	else:
 		with pytest.raises(IndexError):
 			evo.viewleft()
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_viewright(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
 	if items:
 		init, last = evo.viewright()
 		assert last == items[-1]
-		assert check_tree(init) == items[:-1]
-		assert check_tree(evo) == items
+		assert check_seq(init) == items[:-1]
+		assert check_seq(evo) == items
 	else:
 		with pytest.raises(IndexError):
 			evo.viewleft()
 
 @given(indexseqs(count=2, scale=1))
 @check_garbage
-@with_reflists
 def test_evolver_view(iseqitems:IndexSeq):
 	n1, n2, seq, items = iseqitems
 	evo = seq.evolver()
 	if items:
 		m1, m2 = n1 % len(items), n2 % len(items)
 		left, item, right = evo.view(n1)
-		assert check_tree(left) == items[:m1]
+		assert check_seq(left) == items[:m1]
 		assert item == items[m1]
-		assert check_tree(right) == items[m1+1:]
+		assert check_seq(right) == items[m1+1:]
 		if m1 != m2:
 			if m1 > m2: n1, n2, m1, m2 = n2, n1, m2, m1
 			left, item1, mid, item2, right = evo.view(n1, n2)
-			assert check_tree(left) == items[:m1]
+			assert check_seq(left) == items[:m1]
 			assert item1 == items[m1]
-			assert check_tree(mid) == items[m1+1:m2]
+			assert check_seq(mid) == items[m1+1:m2]
 			assert item2 == items[m2]
-			assert check_tree(right) == items[m2+1:]
+			assert check_seq(right) == items[m2+1:]
 	else:
 		with pytest.raises(IndexError):
 			seq.view(0)
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_peekleft(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
@@ -788,7 +749,6 @@ def test_evolver_peekleft(seqitems:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_peekright(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
@@ -800,124 +760,115 @@ def test_evolver_peekright(seqitems:PSequence):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_popleft(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
 	if items:
 		assert evo.popleft() == items[0]
-		assert check_tree(evo) == items[1:]
+		assert check_seq(evo) == items[1:]
 	else:
 		with pytest.raises(IndexError):
 			evo.popleft()
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_popright(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
 	if items:
 		assert evo.popright() == items[-1]
-		assert check_tree(evo) == items[:-1]
+		assert check_seq(evo) == items[:-1]
 	else:
 		with pytest.raises(IndexError):
 			evo.popright()
 
 @given(indexseqs())
 @check_garbage
-@with_reflists
 def test_evolver_pop(iseqitems:IndexSeq):
 	index, seq, items = iseqitems
 	evo = seq.evolver()
 	if items:
 		assert evo.pop() == items[-1]
-		assert check_tree(evo) == items[:-1]
+		assert check_seq(evo) == items[:-1]
 	else:
 		with pytest.raises(IndexError):
 			evo.pop()
 	evo = seq.evolver()
 	if -len(items) <= index < len(items):
 		assert evo.pop(index) == items.pop(index)
-		assert check_tree(evo) == items
+		assert check_seq(evo) == items
 	else:
 		with pytest.raises(IndexError):
 			evo.pop(index)
 
 @given(st.integers(), psequences())
 @check_garbage
-@with_reflists
 def test_evolver_appendleft(item:int, seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
 	evo.appendleft(item)
-	assert check_tree(evo) == [item] + items
+	assert check_seq(evo) == [item] + items
 
 @given(st.integers(), psequences())
 @check_garbage
-@with_reflists
 def test_evolver_appendright(item:int, seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
 	evo.append(item)
-	assert check_tree(evo) == items + [item]
+	assert check_seq(evo) == items + [item]
 	evo = seq.evolver()
 	evo.appendright(item)
-	assert check_tree(evo) == items + [item]
+	assert check_seq(evo) == items + [item]
 
 @given(psequences(), psequences())
 @check_garbage
-@with_reflists
 def test_evolver_extendleft(seqitems1:PSequence, seqitems2:PSequence):
 	seq1, items1 = seqitems1
 	seq2, items2 = seqitems2
 	expect = items2 + items1
 	evo = seq1.evolver()
 	evo.extendleft(seq2)
-	assert check_tree(evo) == expect
+	assert check_seq(evo) == expect
 	evo = seq1.evolver()
 	evo.extendleft(seq2.evolver())
-	assert check_tree(evo) == expect
+	assert check_seq(evo) == expect
 	evo = seq1.evolver()
 	evo.extendleft(items2)
-	assert check_tree(evo) == expect
+	assert check_seq(evo) == expect
 
 @given(psequences(), psequences())
 @check_garbage
-@with_reflists
 def test_evolver_extendright(seqitems1:PSequence, seqitems2:PSequence):
 	seq1, items1 = seqitems1
 	seq2, items2 = seqitems2
 	expect = items1 + items2
 	evo = seq1.evolver()
 	evo.extend(seq2)
-	assert check_tree(evo) == expect
+	assert check_seq(evo) == expect
 	evo = seq1.evolver()
 	evo.extendright(seq2)
-	assert check_tree(evo) == expect
+	assert check_seq(evo) == expect
 	evo = seq1.evolver()
 	evo.extendright(seq2.evolver())
-	assert check_tree(evo) == expect
+	assert check_seq(evo) == expect
 	evo = seq1.evolver()
 	evo.extendright(items2)
-	assert check_tree(evo) == expect
+	assert check_seq(evo) == expect
 
 @given(psequences(max_depth=2), st.integers(-20, 100))
 @hypothesis.settings(deadline=None)
 @check_garbage
-@with_reflists
 def test_evolver_repeat(seqitems:PSequence, times:int):
 	seq, items = seqitems
 	expect = items * times
 	evo = seq.evolver()
-	assert check_tree(evo * times) == expect
-	assert check_tree(evo) == items
+	assert check_seq(evo * times) == expect
+	assert check_seq(evo) == items
 	evo *= times
-	assert check_tree(evo) == expect
+	assert check_seq(evo) == expect
 
 @given(psequences(elements=st.integers(0, 100)), st.integers(0, 100))
 @check_garbage
-@with_reflists
 def test_evolver_contains(seqitems:PSequence, item:int):
 	seq, items = seqitems
 	evo = seq.evolver()
@@ -925,7 +876,6 @@ def test_evolver_contains(seqitems:PSequence, item:int):
 
 @given(psequences(elements=st.integers(0, 20)), st.integers(0, 20))
 @check_garbage
-@with_reflists
 def test_evolver_index(seqitems:PSequence, item:int):
 	seq, items = seqitems
 	evo = seq.evolver()
@@ -937,21 +887,19 @@ def test_evolver_index(seqitems:PSequence, item:int):
 
 @given(psequences(elements=st.integers(0, 20)), st.integers(0, 20))
 @check_garbage
-@with_reflists
 def test_evolver_remove(seqitems:PSequence, item:int):
 	seq, items = seqitems
 	evo = seq.evolver()
 	if item in items:
 		copy = items[:] ; copy.remove(item)
 		evo.remove(item)
-		assert check_tree(evo) == copy
+		assert check_seq(evo) == copy
 	else:
 		with pytest.raises(ValueError):
 			evo.remove(item)
 
 @given(psequences(elements=st.integers(0, 10)), st.integers(0, 10))
 @check_garbage
-@with_reflists
 def test_evolver_count(seqitems:PSequence, item:int):
 	seq, items = seqitems
 	evo = seq.evolver()
@@ -959,39 +907,35 @@ def test_evolver_count(seqitems:PSequence, item:int):
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_sort(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
 	evo.sort()
-	assert check_tree(evo) == sorted(items)
+	assert check_seq(evo) == sorted(items)
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_copy(seqitems:PSequence):
 	seq, items = seqitems
 	hypothesis.assume(len(items))
 	evo1 = seq.evolver()
 	evo2 = evo1.copy()
 	evo2[0] *= 2
-	assert check_tree(evo1) == items
+	assert check_seq(evo1) == items
 	items[0] *= 2
-	assert check_tree(evo2) == items
+	assert check_seq(evo2) == items
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_clear(seqitems:PSequence):
 	seq, items = seqitems
 	hypothesis.assume(len(items))
 	evo = seq.evolver()
 	evo.clear()
-	assert check_tree(evo) == []
+	assert check_seq(evo) == []
 
 @given(indexseqs())
 @check_garbage
-@with_reflists
 def test_evolver_get(iseqitems:IndexSeq):
 	index, seq, items = iseqitems
 	evo = seq.evolver()
@@ -1003,15 +947,14 @@ def test_evolver_get(iseqitems:IndexSeq):
 
 @given(indexseqs(), st.integers())
 @check_garbage
-@with_reflists
 def test_evolver_set_single(iseqitems:IndexSeq, item:int):
 	index, seq, items = iseqitems
 	if -len(items) <= index < len(items):
 		copy = items[:] ; copy[index] = item
 		evo = seq.evolver() ; evo.set(index, item)
-		assert check_tree(seq.set(index, item)) == copy
+		assert check_seq(seq.set(index, item)) == copy
 		evo = seq.evolver() ; evo[index] = item
-		assert check_tree(seq.set(index, item)) == copy
+		assert check_seq(seq.set(index, item)) == copy
 	else:
 		evo = seq.evolver()
 		with pytest.raises(IndexError):
@@ -1021,58 +964,55 @@ def test_evolver_set_single(iseqitems:IndexSeq, item:int):
 
 @given(indexseqs(count=2), st.lists(st.integers()))
 @check_garbage
-@with_reflists
 def test_evolver_set_slice(iseqitems:IndexSeq, update:list):
 	start, stop, seq, items = iseqitems
 	# [start:]
 	copy = items[:] ; copy[start:] = update
 	evo = seq.evolver() ; evo.set(slice(start, None), update)
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	evo = seq.evolver() ; evo[start:] = update
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	# [:stop]
 	copy = items[:] ; copy[:stop] = update
 	evo = seq.evolver() ; evo.set(slice(None, stop), update)
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	evo = seq.evolver() ; evo[:stop] = update
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	# [start:stop]
 	copy = items[:] ; copy[start:stop] = update
 	evo = seq.evolver() ; evo.set(slice(start, stop), update)
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	evo = seq.evolver() ; evo[start:stop] = update
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 
 @given(indexseqs(count=2))
 @check_garbage
-@with_reflists
 def test_evolver_set_slice_reversed(iseqitems:IndexSeq):
 	start, stop, seq, items = iseqitems
 	# [start::-1]
 	update = [RefInt(1 - 2 * x) for x in items[start::-1]]
 	copy = items[:] ; copy[start::-1] = update
 	evo = seq.evolver() ; evo.set(slice(start, None, -1), update)
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	evo = seq.evolver() ; evo[start::-1] = update
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	# [:stop:-1]
 	update = [RefInt(1 - 2 * x) for x in items[:stop:-1]]
 	copy = items[:] ; copy[:stop:-1] = update
 	evo = seq.evolver() ; evo.set(slice(None, stop, -1), update)
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	evo = seq.evolver() ; evo[:stop:-1] = update
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	# [start:stop:-1]
 	update = [RefInt(1 - 2 * x) for x in items[start:stop:-1]]
 	copy = items[:] ; copy[start:stop:-1] = update
 	evo = seq.evolver() ; evo.set(slice(start, stop, -1), update)
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	evo = seq.evolver() ; evo[start:stop:-1] = update
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 
 @given(indexseqs(count=3))
 @check_garbage
-@with_reflists
 def test_evolver_set_slice_step(iseqitems:IndexSeq):
 	start, stop, step, seq, items = iseqitems
 	hypothesis.assume(step != 0)
@@ -1080,27 +1020,26 @@ def test_evolver_set_slice_step(iseqitems:IndexSeq):
 	update = [RefInt(1 - 2 * x) for x in items[start::step]]
 	copy = items[:] ; copy[start::step] = update
 	evo = seq.evolver() ; evo.set(slice(start, None, step), update)
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	evo = seq.evolver() ; evo[start::step] = update
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	# [:stop:step]
 	update = [RefInt(1 - 2 * x) for x in items[:stop:step]]
 	copy = items[:] ; copy[:stop:step] = update
 	evo = seq.evolver() ; evo.set(slice(None, stop, step), update)
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	evo = seq.evolver() ; evo[:stop:step] = update
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	# [start:stop:step]
 	update = [RefInt(1 - 2 * x) for x in items[start:stop:step]]
 	copy = items[:] ; copy[start:stop:step] = update
 	evo = seq.evolver() ; evo.set(slice(start, stop, step), update)
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	evo = seq.evolver() ; evo[start:stop:step] = update
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 
 @given(psequences(), st.lists(st.integers()))
 @check_garbage
-@with_reflists
 def test_evolver_mset(seqitems:PSequence, updates:list):
 	seq, items = seqitems
 	hypothesis.assume(len(items) > 0)
@@ -1114,31 +1053,29 @@ def test_evolver_mset(seqitems:PSequence, updates:list):
 		sets.append((idx, val))
 	evo = seq.evolver()
 	evo.mset(*updates)
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	evo = seq.evolver()
 	evo.mset(*sets)
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 
 @given(indexseqs(), st.integers())
 @check_garbage
-@with_reflists
 def test_evolver_insert(iseqitems:IndexSeq, item:int):
 	index, seq, items = iseqitems
 	copy = items[:] ; copy.insert(index, item)
 	evo = seq.evolver() ; evo.insert(index, item)
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 
 @given(indexseqs())
 @check_garbage
-@with_reflists
 def test_evolver_delete_single(iseqitems:IndexSeq):
 	index, seq, items = iseqitems
 	if -len(items) <= index < len(items):
 		copy = items[:] ; del copy[index]
 		evo = seq.evolver() ; evo.delete(index)
-		assert check_tree(evo) == copy
+		assert check_seq(evo) == copy
 		evo = seq.evolver() ; del evo[index]
-		assert check_tree(evo) == copy
+		assert check_seq(evo) == copy
 	else:
 		with pytest.raises(IndexError):
 			evo = seq.evolver() ; evo.delete(index)
@@ -1147,115 +1084,105 @@ def test_evolver_delete_single(iseqitems:IndexSeq):
 
 @given(indexseqs(count=2))
 @check_garbage
-@with_reflists
 def test_evolver_delete_slice(iseqitems:IndexSeq):
 	start, stop, seq, items = iseqitems
 	copy = items[:] ; del copy[start:]
 	evo = seq.evolver() ; del evo[start:]
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	copy = items[:] ; del copy[:stop]
 	evo = seq.evolver() ; del evo[:stop]
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	copy = items[:] ; del copy[start:stop]
 	evo = seq.evolver() ; del evo[start:stop]
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 
 @given(indexseqs(count=2))
 @check_garbage
-@with_reflists
 def test_evolver_delete_slice_reversed(iseqitems:IndexSeq):
 	start, stop, seq, items = iseqitems
 	copy = items[:] ; del copy[start::-1]
 	evo = seq.evolver() ; del evo[start::-1]
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	copy = items[:] ; del copy[:stop:-1]
 	evo = seq.evolver() ; del evo[:stop:-1]
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	copy = items[:] ; del copy[start:stop:-1]
 	evo = seq.evolver() ; del evo[start:stop:-1]
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 
 @given(indexseqs(count=3))
 @check_garbage
-@with_reflists
 def test_evolver_delete_slice_step(iseqitems:IndexSeq):
 	start, stop, step, seq, items = iseqitems
 	hypothesis.assume(step != 0)
 	copy = items[:] ; del copy[::step]
 	evo = seq.evolver() ; del evo[::step]
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	copy = items[:] ; del copy[start::step]
 	evo = seq.evolver() ; del evo[start::step]
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	copy = items[:] ; del copy[:stop:step]
 	evo = seq.evolver() ; del evo[:stop:step]
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 	copy = items[:] ; del copy[start:stop:step]
 	evo = seq.evolver() ; del evo[start:stop:step]
-	assert check_tree(evo) == copy
+	assert check_seq(evo) == copy
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_reverse(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
 	evo.reverse()
-	assert check_tree(evo) == items[::-1]
+	assert check_seq(evo) == items[::-1]
 
 @given(indexseqs())
 @check_garbage
-@with_reflists
 def test_evolver_splitat(iseqitems:IndexSeq):
 	index, seq, items = iseqitems
 	evo = seq.evolver()
 	left, right = evo.splitat(index)
-	assert check_tree(left) == items[:index]
-	assert check_tree(right) == items[index:]
+	assert check_seq(left) == items[:index]
+	assert check_seq(right) == items[index:]
 
 @given(indexseqs(count=2))
 @check_garbage
-@with_reflists
 def test_evolver_slice(iseqitems:IndexSeq):
 	start, stop, seq, items = iseqitems
 	evo = seq.evolver()
-	assert check_tree(evo[start:]) == items[start:]
-	assert check_tree(evo[:stop]) == items[:stop]
-	assert check_tree(evo[start:stop]) == items[start:stop]
+	assert check_seq(evo[start:]) == items[start:]
+	assert check_seq(evo[:stop]) == items[:stop]
+	assert check_seq(evo[start:stop]) == items[start:stop]
 
 @given(indexseqs(count=2))
 @check_garbage
-@with_reflists
 def test_evolver_slice_reversed(iseqitems:IndexSeq):
 	start, stop, seq, items = iseqitems
 	evo = seq.evolver()
-	assert check_tree(evo[start::-1]) == items[start::-1]
-	assert check_tree(evo[:stop:-1]) == items[:stop:-1]
-	assert check_tree(evo[start:stop:-1]) == items[start:stop:-1]
+	assert check_seq(evo[start::-1]) == items[start::-1]
+	assert check_seq(evo[:stop:-1]) == items[:stop:-1]
+	assert check_seq(evo[start:stop:-1]) == items[start:stop:-1]
 
 @given(indexseqs(count=3))
 @check_garbage
-@with_reflists
 def test_evolver_slice_step(iseqitems:IndexSeq):
 	start, stop, step, seq, items = iseqitems
 	hypothesis.assume(step != 0)
 	evo = seq.evolver()
-	assert check_tree(evo[::step]) == items[::step]
-	assert check_tree(evo[start::step]) == items[start::step]
-	assert check_tree(evo[:stop:step]) == items[:stop:step]
-	assert check_tree(evo[start:stop:step]) == items[start:stop:step]
+	assert check_seq(evo[::step]) == items[::step]
+	assert check_seq(evo[start::step]) == items[start::step]
+	assert check_seq(evo[:stop:step]) == items[:stop:step]
+	assert check_seq(evo[start:stop:step]) == items[start:stop:step]
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_reduce(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
-	assert check_tree(pickle.loads(pickle.dumps(evo))) == items
+	assert check_seq(pickle.loads(pickle.dumps(evo))) == items
 
 @given(psequences())
 @check_garbage
-@with_reflists
 def test_evolver_hash(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()

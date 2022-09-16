@@ -3,7 +3,7 @@ from functools import wraps
 from itertools import groupby
 
 from .base import PSequenceBase, PSequenceEvolverBase
-from ..util import compare
+from ..util import compare_iter
 
 class PSequence(PSequenceBase):
 	# no docstring - inherit docstring from PSequenceBase
@@ -646,17 +646,29 @@ class PSequence(PSequenceBase):
 		return self._size
 
 	def __eq__(self, other):
-		return compare(self, other, True) == 0
+		result = compare_iter(self, other, True)
+		if result is NotImplemented: return result
+		return result == 0
 	def __ne__(self, other):
-		return compare(self, other, True) != 0
+		result = compare_iter(self, other, True)
+		if result is NotImplemented: return result
+		return result != 0
 	def __gt__(self, other):
-		return compare(self, other, False) > 0
+		result = compare_iter(self, other, False)
+		if result is NotImplemented: return result
+		return result > 0
 	def __ge__(self, other):
-		return compare(self, other, False) >= 0
+		result = compare_iter(self, other, False)
+		if result is NotImplemented: return result
+		return result >= 0
 	def __lt__(self, other):
-		return compare(self, other, False) < 0
+		result = compare_iter(self, other, False)
+		if result is NotImplemented: return result
+		return result < 0
 	def __le__(self, other):
-		return compare(self, other, False) <= 0
+		result = compare_iter(self, other, False)
+		if result is NotImplemented: return result
+		return result <= 0
 
 	def __repr__(self):
 		return 'psequence({})'.format(list(self))
