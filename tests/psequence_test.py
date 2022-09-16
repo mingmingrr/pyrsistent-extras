@@ -9,6 +9,7 @@ import pytest
 import inspect
 import typing
 import gc
+import os
 
 # {{{ strategies
 
@@ -101,16 +102,16 @@ def check_tree(tree, depth, acc):
 	elif ftype == 'Digit':
 		assert len(items) in (1, 2, 3, 4)
 		check_items(size, acc, *((item, depth) for item in items))
-	elif ftype == 'Tree':
+	else:
+		assert ftype == 'Tree'
 		if len(items) == 0:
 			assert size == 0
 		elif len(items) == 1:
 			check_items(size, acc, (items[0], depth))
-		elif len(items) == 3:
+		else:
+			assert len(items) == 3
 			check_items(size, acc, (items[0], depth),
 				(items[1], depth + 1), (items[2], depth))
-		else: assert False
-	else: assert False
 	return size
 
 def check_seq(seq):
@@ -183,6 +184,10 @@ def check_garbage(func):
 # }}}
 
 # {{{ test_psequence
+
+def test_c_ext():
+	if not os.environ.get('PYRSISTENT_NO_C_EXTENSION'): # pragma: no cover
+		import pyrsistent_extras.psequence.c_ext
 
 @given(psequences())
 @check_garbage

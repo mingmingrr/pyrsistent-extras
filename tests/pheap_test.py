@@ -8,10 +8,6 @@ import pickle
 import pytest
 import bisect
 
-def trace(*args, **kwargs):
-	print(*args, **kwargs)
-	return args[-1]
-
 def pitems(keys=st.integers(), values=st.integers()):
 	return st.tuples(keys, values)
 

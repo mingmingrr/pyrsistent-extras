@@ -8,7 +8,8 @@ if not os.environ.get('PYRSISTENT_NO_C_EXTENSION'): # pragma: no cover
 		from .c_ext import psequence, PSequence, Evolver # type: ignore
 		use_c_ext = True
 	except ImportError as err:
-		pass
+		import warnings
+		warnings.warn('failed to import C extension for PSequence', ImportWarning)
 
 if not use_c_ext:
 	from .python import psequence, PSequence, Evolver
