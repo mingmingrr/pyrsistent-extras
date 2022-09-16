@@ -1,5 +1,5 @@
 import os
-from setuptools import setup, Extension
+import setuptools
 import sys
 import platform
 import codecs
@@ -17,7 +17,7 @@ else:
 extensions = []
 if platform.python_implementation() == 'CPython' and os.getenv('PYRSISTENT_SKIP_EXTENSION') is None:
     extensions = [
-        Extension(
+        setuptools.Extension(
             'pyrsistent_extras.psequence.c_ext',
             sources=['pyrsistent_extras/psequence/c_ext.c']
         ),
@@ -55,7 +55,7 @@ WARNING: Could not build the %s.
             sys.stderr.write('%s\n' % str(e))
             sys.stderr.write(self.warning_message % ('%s extension module' % name, 'The output above this warning shows how the compilation failed.'))
 
-setup(
+setuptools.setup(
     name='pyrsistent-extras',
     description='Extra data structures for pyrsistent',
     long_description=readme,
