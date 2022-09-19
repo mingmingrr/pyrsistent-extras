@@ -18,8 +18,8 @@ extensions = []
 if platform.python_implementation() == 'CPython' and os.getenv('PYRSISTENT_SKIP_EXTENSION') is None:
     extensions = [
         setuptools.Extension(
-            'pyrsistent_extras.psequence.c_ext',
-            sources=['pyrsistent_extras/psequence/c_ext.c']
+            'pyrsistent_extras._psequence._c_ext',
+            sources=['pyrsistent_extras/psequence/_c_ext.c']
         ),
     ]
 
@@ -84,8 +84,8 @@ setuptools.setup(
     cmdclass={'build_ext': custom_build_ext},
     packages=[
         'pyrsistent_extras',
-        'pyrsistent_extras.psequence',
+        'pyrsistent_extras._psequence',
     ],
-    package_data={'pyrsistent': ['py.typed', '__init__.pyi', 'typing.pyi']},
+    package_data={'pyrsistent-extras': ['py.typed']},
     python_requires='>=3.7',
 )
