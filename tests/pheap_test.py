@@ -1,9 +1,10 @@
-from pyrsistent_extras.pheap import \
+from pyrsistent_extras._pheap import \
 	hl, pminheap, PMinHeap, hg, pmaxheap, PMaxHeap
 
 import hypothesis
 from hypothesis import given, strategies as st
 
+import collections
 import pickle
 import pytest
 import bisect
@@ -12,17 +13,20 @@ def pitems(keys=st.integers(), values=st.integers()):
 	return st.tuples(keys, values)
 
 def makeheaps(funcs):
-	def inner(unique=False, keys=st.integers(), values=st.integers(), **kwargs):
+	def inner(unique=False, items=pitems(), **kwargs):
 		if unique: # pragma: no cover
 			kwargs['unique'] = True
 			kwargs['unique_by'] = lambda xs: xs[0]
-		lists = st.lists(pitems(keys, values), **kwargs)
+		lists = st.lists(items, **kwargs)
 		return st.builds(lambda f, xs: (f(xs), list(sorted(xs))), funcs, lists)
 	return inner
 
 pmaxheaps = makeheaps(st.just(pmaxheap))
 pminheaps = makeheaps(st.just(pminheap))
 pheaps = makeheaps(st.one_of(st.just(pminheap), st.just(pmaxheap)))
+
+smallints = lambda n=4: st.integers(1, n)
+smallitems = lambda n=4: pitems(smallints(n), smallints(n))
 
 def pheappairs(heaps):
 	return st.one_of(st.tuples(heaps(pminheaps), heaps(pminheaps)),
@@ -125,8 +129,8 @@ def test_push(heapitems, key, value):
 	bisect.insort(items, (key, value))
 	assert check_heap(heap.push(key, value)) == items
 
-@given(pheaps(), st.integers(), st.integers())
-def test_pop(heapitems, key, value):
+@given(pheaps())
+def test_pop(heapitems):
 	heap, items = heapitems
 	if items:
 		key1, value1, heap1 = heap.pop()
@@ -142,6 +146,19 @@ def test_pop(heapitems, key, value):
 		with pytest.raises(IndexError):
 			heap.pop()
 
+@given(pheaps())
+def test_peek(heapitems):
+	heap, items = heapitems
+	if items:
+		key, value = heap.peek()
+		if isinstance(heap, PMaxHeap):
+			assert key == items[-1][0]
+		else:
+			assert key == items[0][0]
+	else:
+		with pytest.raises(IndexError):
+			heap.peek()
+
 @given(pheappairs(lambda heaps: heaps()))
 def test_merge(args):
 	heapitems1, heapitems2 = args
@@ -151,7 +168,7 @@ def test_merge(args):
 	assert check_heap(heap1.merge(heap2)) == items
 	assert check_heap(heap1 + heap2) == items
 
-@given(pheaps(), st.integers())
+@given(pheaps(items=smallitems(10)), st.integers())
 def test_contains(heapitems, key):
 	heap, items = heapitems
 	assert (key in heap) == any(k == key for k, v in items)
@@ -162,7 +179,7 @@ def test_len(heapitems):
 	assert len(heap) == len(items)
 
 @given(pheappairs(lambda heaps:
-	heaps(keys=st.integers(1,4), values=st.just(0))))
+	heaps(items=pitems(st.integers(1,4), st.just(0)))))
 def test_compare_int(args):
 	heapitems1, heapitems2 = args
 	heap1, items1 = heapitems1
@@ -180,7 +197,7 @@ def test_compare_int(args):
 	assert (heap1 >  heap2) == (items1 >  items2)
 
 @given(pheappairs(lambda heaps:
-	heaps(keys=st.integers(1,4), values=st.just(None))))
+	heaps(items=pitems(st.integers(1,4), st.just(None)))))
 def test_compare_none(args):
 	heapitems1, heapitems2 = args
 	heap1, items1 = heapitems1
@@ -189,8 +206,7 @@ def test_compare_none(args):
 	assert (heap1 == heap2) == (items1 == items2)
 	assert (heap1 != heap2) == (items1 != items2)
 
-smallitems = pitems(keys=st.integers(1,4), values=st.integers(1,4))
-@given(st.lists(smallitems), st.lists(smallitems))
+@given(st.lists(smallitems()), st.lists(smallitems()))
 def test_compare_dict(items1, items2):
 	items1 = [(k, {v:None}) for k, v in sorted(items1)]
 	items2 = [(k, {v:None}) for k, v in sorted(items2)]
@@ -210,11 +226,62 @@ def test_repr(heapitems):
 	heap1, items = heapitems
 	heap2 = eval(repr(heap1))
 	assert type(heap1) == type(heap2)
-	assert check_heap(heap2) == sorted(items)
+	assert check_heap(heap2) == items
 
 @given(pheaps())
 def test_reduce(heapitems):
 	heap, items = heapitems
-	assert check_heap(pickle.loads(pickle.dumps(heap))) == sorted(items)
+	assert check_heap(pickle.loads(pickle.dumps(heap))) == items
+
+@given(pheaps())
+def test_bool(heapitems):
+	heap, items = heapitems
+	assert bool(heap) == bool(items)
+
+@given(pheaps())
+def test_iter(heapitems):
+	heap, items = heapitems
+	keys = [k for k, _ in items]
+	if heap._down:
+		keys = list(reversed(keys))
+	assert list(heap) == keys
+
+@given(pheaps())
+def test_keys(heapitems):
+	heap, items = heapitems
+	assert len(heap.keys()) == len(items)
+	keys = [k for k, _ in items]
+	if heap._down:
+		keys = list(reversed(keys))
+	assert list(heap.keys()) == keys
+	for k, v in items[:5] + items[-5:]:
+		assert k in heap.keys()
+		assert (k + 1 in heap.keys()) \
+			== any(n == k + 1 for n, _ in items)
+
+@given(pheaps())
+def test_values(heapitems):
+	heap, items = heapitems
+	assert len(heap.values()) == len(items)
+	assert collections.Counter(heap.values()) \
+		== collections.Counter(v for _, v in items)
+	for k, v in items[:5] + items[-5:]:
+		assert v in heap.values()
+		assert (v + 1 in heap.values()) \
+			== any(n == v + 1 for _, n in items)
+
+@given(pheaps())
+def test_items(heapitems):
+	heap, items = heapitems
+	assert len(heap.items()) == len(items)
+	assert sorted(heap.items()) == items
+	keys = [k for k, _ in items]
+	if heap._down:
+		keys = list(reversed(keys))
+	assert [k for k, _ in heap.items()] == keys
+	for k, v in items[:5] + items[-5:]:
+		assert (k, v) in heap.items()
+		assert ((k, v + 1) in heap.items()) \
+			== any(n == (k, v + 1) for n in items)
 
 # vim: set foldmethod=marker:

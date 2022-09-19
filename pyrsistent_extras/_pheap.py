@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from typing import Collection, Iterable, Iterator, Hashable, \
 	ClassVar, TypeVar, Generic, Optional, Callable, Tuple, Any, Union, cast
 from abc import abstractmethod
@@ -7,7 +6,7 @@ from abc import abstractmethod
 import itertools
 import operator
 
-from .util import Comparable, compare_single, compare_next, compare_iter
+from ._util import Comparable, compare_single, compare_next, compare_iter
 
 T = TypeVar('T')
 K = TypeVar('K', bound=Comparable)
@@ -168,6 +167,41 @@ class HeapValues(HeapView[V,K,V]):
 		return (v for k, v in super()._iter())
 
 class Heap(Generic[K,V], Collection[K], Hashable):
+	r'''
+	Persistent heap
+
+	Meant for cases where a priority queue is needed.
+
+	Do not instantiate directly, instead use the factory
+	functions :func:`hl` or :func:`pminheap` to create a min-heap,
+	and :func:`hg` or :func:`pmaxheap` to create a max-heap.
+
+	The :class:`PMinHeap` and :class:`PMaxHeap` implements the
+	:class:`python:Container` protocol and is :class:`python:Hashable`.
+
+	The implementation is a binomial heap.
+	Merge/push/pop operations are :math:`O(\log{n})`.
+	Operations are not stable - values pushed with the same key
+	may be popped in a different order.
+
+	The following are examples of some common operations on persistent heaps:
+
+	>>> heap1 = pminheap([(1, 'a'), (2, 'b')])
+	>>> heap1
+	pminheap([(1, 'a'), (2, 'b')])
+	>>> heap2 = heap1.push(3, 'c')
+	>>> heap2
+	pminheap([(1, 'a'), (2, 'b'), (3, 'c')])
+	>>> heap3 = heap1 + heap2
+	>>> heap3
+	pminheap([(1, 'a'), (1, 'a'), (2, 'b'), (2, 'b'), (3, 'c')])
+	>>> key, value, heap4 = heap3.pop()
+	>>> (key, value)
+	(1, 'a')
+	>>> heap4
+	pminheap([(1, 'a'), (2, 'b'), (2, 'b'), (3, 'c')])
+	'''
+
 	__slots__ = ('_size', '_key', '_value', '_forest')
 
 	_size: int
@@ -218,34 +252,34 @@ class Heap(Generic[K,V], Collection[K], Hashable):
 
 	__add__ = merge
 
-	def peek(self):
+	def peek(self) -> Tuple[K,V]:
 		if self._size == 0:
 			raise IndexError('min of empty heap')
 		return self._key, self._value
 
-	def __len__(self):
+	def __len__(self) -> int:
 		return self._size
 
-	def __bool__(self):
+	def __bool__(self) -> bool:
 		return self._size != 0
 
-	def __contains__(self, key):
+	def __contains__(self, key) -> bool:
 		return key in HeapKeys(self, False)
 
-	def __repr__(self):
+	def __repr__(self) -> str:
 		return '{}({})'.format(self._name, list(self.items()))
 
-	def items(self, sorted:bool=True):
+	def items(self, sorted:bool=True) -> HeapItems[K,V]:
 		return HeapItems(self, sorted)
 
-	def keys(self, sorted:bool=True):
+	def keys(self, sorted:bool=True) -> HeapKeys[K,V]:
 		return HeapKeys(self, sorted)
 
-	def values(self, sorted:bool=True):
+	def values(self, sorted:bool=True) -> HeapValues[V,K]:
 		return HeapValues(self, sorted)
 
-	def __iter__(self):
-		return iter(HeapKeys(self))
+	def __iter__(self) -> Iterator[K]:
+		return iter(HeapKeys(self, True))
 
 	@classmethod
 	def _fromitems(cls, items:HeapLike[K,V]) -> Heap[K,V]:
@@ -300,32 +334,32 @@ class Heap(Generic[K,V], Collection[K], Hashable):
 					return 1
 			assert not yvalues
 
-	def __eq__(self, other):
+	def __eq__(self, other) -> bool:
 		result = self._compare(other, True)
-		if result is NotImplemented: return result
+		if result is NotImplemented: return NotImplemented
 		return result == 0
-	def __ne__(self, other):
+	def __ne__(self, other) -> bool:
 		result = self._compare(other, True)
-		if result is NotImplemented: return result
+		if result is NotImplemented: return NotImplemented
 		return result != 0
-	def __gt__(self, other):
+	def __gt__(self, other) -> bool:
 		result = self._compare(other, False)
-		if result is NotImplemented: return result
+		if result is NotImplemented: return NotImplemented
 		return result > 0
-	def __ge__(self, other):
+	def __ge__(self, other) -> bool:
 		result = self._compare(other, False)
-		if result is NotImplemented: return result
+		if result is NotImplemented: return NotImplemented
 		return result >= 0
-	def __lt__(self, other):
+	def __lt__(self, other) -> bool:
 		result = self._compare(other, False)
-		if result is NotImplemented: return result
+		if result is NotImplemented: return NotImplemented
 		return result < 0
-	def __le__(self, other):
+	def __le__(self, other) -> bool:
 		result = self._compare(other, False)
-		if result is NotImplemented: return result
+		if result is NotImplemented: return NotImplemented
 		return result <= 0
 
-	def __hash__(self):
+	def __hash__(self) -> int:
 		h = hash(self._name)
 		for k, vs in itertools.groupby(self.items(), key=operator.itemgetter(0)):
 			h = hash((h, k, tuple(sorted(vs))))
@@ -336,35 +370,44 @@ class Heap(Generic[K,V], Collection[K], Hashable):
 
 HeapLike = Union[Heap[K,V],Iterable[Tuple[K,V]]]
 
-def fromkeys(func):
-	def inner(items:Iterable[K]) -> Heap[K,None]:
-		return func((item, None) for item in items)
-	return inner
-
 class PMinHeap(Heap[K,V]):
+	__doc__ = Heap.__doc__
 	_name: ClassVar[str] = 'pminheap'
 	_down: ClassVar[bool] = False
 	_empty: ClassVar[PMinHeap[Any,Any]] = cast(Any, None)
 PMinHeap._empty = PMinHeap(0, None, None, None) # type: ignore
 
-def pminheap(items:HeapLike[K,V]=PMinHeap._empty) -> Heap[K,V]:
-	return PMinHeap._fromitems(items)
-setattr(pminheap, 'fromkeys', fromkeys(pminheap))
+def pminheap(items:HeapLike[K,V]=PMinHeap._empty) -> PMinHeap[K,V]:
+	return cast(PMinHeap, PMinHeap._fromitems(items))
 
-def hl(*items:Tuple[K,V]) -> Heap[K,V]:
+def pminheap_fromkeys(items:Iterable[K]) -> PMinHeap[K,None]:
+	return pminheap((item, None) for item in items)
+setattr(pminheap, 'fromkeys', pminheap_fromkeys)
+
+def hl(*items:Tuple[K,V]) -> PMinHeap[K,V]:
 	return pminheap(items)
 
 class PMaxHeap(Heap[K,V]):
+	__doc__ = Heap.__doc__
 	_name: ClassVar[str] = 'pmaxheap'
 	_down: ClassVar[bool] = True
 	_empty: ClassVar[PMaxHeap[Any,Any]] = cast(Any, None)
 PMaxHeap._empty = PMaxHeap(0, None, None, None) # type: ignore
 
-def pmaxheap(items:HeapLike[K,V]=PMaxHeap._empty) -> Heap[K,V]:
-	return PMaxHeap._fromitems(items)
-setattr(pmaxheap, 'fromkeys', fromkeys(pmaxheap))
+def pmaxheap(items:HeapLike[K,V]=PMaxHeap._empty) -> PMaxHeap[K,V]:
+	return cast(PMaxHeap, PMaxHeap._fromitems(items))
 
-def hg(*items:Tuple[K,V]) -> Heap[K,V]:
+def pmaxheap_fromkeys(items:Iterable[K]) -> PMaxHeap[K,None]:
+	return pmaxheap((item, None) for item in items)
+setattr(pmaxheap, 'fromkeys', pmaxheap_fromkeys)
+
+def hg(*items:Tuple[K,V]) -> PMaxHeap[K,V]:
+	'''
+	Shorthand to create a PMaxHeap
+
+	>>> hg((1,'a'), (2,'b'), (3,'c'))
+	pmaxheap([(3, 'c'), (2, 'b'), (1, 'a')])
+	'''
 	return pmaxheap(items)
 
 __all__ = ('hl', 'pminheap', 'PMinHeap', 'hg', 'pmaxheap', 'PMaxHeap')

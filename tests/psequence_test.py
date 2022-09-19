@@ -1,4 +1,4 @@
-from pyrsistent_extras.psequence import psequence, PSequence, sq
+from pyrsistent_extras._psequence import psequence, PSequence, sq
 
 import hypothesis
 from hypothesis import given, strategies as st
@@ -10,6 +10,19 @@ import inspect
 import typing
 import gc
 import os
+import platform
+import datetime
+
+hypothesis.settings.register_profile('pypy',
+	max_examples=10,
+	deadline=datetime.timedelta(milliseconds=500),
+	suppress_health_check=[hypothesis.HealthCheck.data_too_large])
+
+default_depth = 4
+
+if platform.python_implementation() == 'PyPy': # pragma: no cover
+	hypothesis.settings.load_profile('pypy')
+	default_depth = 3
 
 # {{{ strategies
 
@@ -59,7 +72,7 @@ def fingertrees(elements, depth, max_depth):
 		st.builds(lambda l, m, r: ('Tree', l[1] + m[1] + r[1], l, m, r),
 			digit, tree, digit))
 
-def psequences(elements=st.integers(), max_depth=4):
+def psequences(elements=st.integers(), max_depth=default_depth):
 	'''
 	generate a PSequence as its tuple representation
 	'''
@@ -185,9 +198,12 @@ def check_garbage(func):
 
 # {{{ test_psequence
 
-def test_c_ext():
-	if not os.environ.get('PYRSISTENT_NO_C_EXTENSION'): # pragma: no cover
-		import pyrsistent_extras.psequence.c_ext
+def test_c_ext(): # pragma: no cover
+	if platform.python_implementation() == 'CPython' \
+			and not os.environ.get('PYRSISTENT_NO_C_EXTENSION'):
+		import pyrsistent_extras._psequence._c_ext
+	else:
+		pytest.skip()
 
 @given(psequences())
 @check_garbage

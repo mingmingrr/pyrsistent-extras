@@ -3530,7 +3530,7 @@ static PyMethodDef PSequence_methods[] = {
 
 static PyTypeObject PSequenceType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	.tp_name              = (const char*)"pyrsistent._psequence.c_ext.PSequence",
+	.tp_name              = (const char*)"pyrsistent_extras._psequence._c_ext.PSequence",
 	.tp_basicsize         = (Py_ssize_t)sizeof(PSequence),
 	// .tp_itemsize          = (Py_ssize_t)0,
 	.tp_dealloc           = (destructor)PSequence_dealloc,
@@ -3801,7 +3801,7 @@ static PyMethodDef PSequenceIter_methods[] = {
 
 static PyTypeObject PSequenceIterType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	.tp_name              = (const char*)"pyrsistent._psequence.c_ext.Iterator",
+	.tp_name              = (const char*)"pyrsistent_extras._psequence._c_ext.Iterator",
 	.tp_basicsize         = (Py_ssize_t)sizeof(PSequenceIter),
 	// .tp_itemsize          = (Py_ssize_t)0,
 	.tp_dealloc           = (destructor)PSequenceIter_dealloc,
@@ -4126,7 +4126,7 @@ static PyMappingMethods PSequenceEvolver_asMapping = {
 
 static PyTypeObject PSequenceEvolverType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	.tp_name              = (const char*)"pyrsistent._psequence.c_ext.Iterator",
+	.tp_name              = (const char*)"pyrsistent_extras._psequence._c_ext.Iterator",
 	.tp_basicsize         = (Py_ssize_t)sizeof(PSequenceEvolver),
 	// .tp_itemsize          = (Py_ssize_t)0,
 	.tp_dealloc           = (destructor)PSequenceEvolver_dealloc,
@@ -4197,7 +4197,7 @@ static PyMethodDef methodDef[] = {
 
 static struct PyModuleDef moduleDef = {
 	PyModuleDef_HEAD_INIT,
-	.m_name     = (const char*)"pyrsistent._psequence.c_ext",
+	.m_name     = (const char*)"pyrsistent_extras._psequence._c_ext",
 	.m_doc      = (const char*)"persistent sequence c implementation",
 	.m_size     = (Py_ssize_t)-1,
 	.m_methods  = (PyMethodDef*)methodDef,
@@ -4227,7 +4227,7 @@ void* PObj_getDoc(const char* name, PyObject* base) {
 bool pyrsistent_psequence_inheritDocs() {
 	bool okay = false;
 
-	PyObject* module = PyImport_ImportModule("pyrsistent._psequence._base");
+	PyObject* module = PyImport_ImportModule("pyrsistent_extras._psequence._base");
 	if(module == NULL) goto err0;
 
 	PyObject* seqbase = PyObject_GetAttrString(module, "PSequenceBase");
@@ -4277,7 +4277,7 @@ bool pyrsistent_psequence_inheritDocs() {
 	err0: return okay;
 }
 
-PyMODINIT_FUNC PyInit_c_ext() {
+PyMODINIT_FUNC PyInit__c_ext() {
 	if(!pyrsistent_psequence_inheritDocs()) return NULL;
 
 	if(PyType_Ready(&PSequenceType) < 0) return NULL;

@@ -1,13 +1,18 @@
+from __future__ import annotations
+from typing import Sequence, MutableSequence, Hashable, \
+	Any, Iterator, Iterable, TypeVar, Union, \
+	List, Tuple, Optional, overload, cast
+
 from enum import Enum
 from functools import wraps
 from itertools import groupby
 
-from .base import PSequenceBase, PSequenceEvolverBase
-from ..util import compare_iter
+from ._base import PSequenceBase, PSequenceEvolverBase
+from .._util import compare_iter
 
-class PSequence(PSequenceBase):
-	# no docstring - inherit docstring from PSequenceBase
+T = TypeVar('T')
 
+class PSequence(PSequenceBase[T]):
 	# Support structure for PSequence.
 
 	# Fingertrees, digits, and nodes are all represented using the
@@ -19,12 +24,18 @@ class PSequence(PSequenceBase):
 
 	# Value-type nodes (node1) are PSequence(type=Node, size=1, items=[value])
 
+	__doc__ = PSequenceBase.__doc__
+
 	__slots__ = ('_type', '_size', '_items')
 
 	class _Type(Enum):
 		Node = 0
 		Digit = 1
 		Tree = 2
+
+	_type: PSequence._Type
+	_size: int
+	_items: Tuple[PSequence[T], ...]
 
 	def __new__(cls, _type, _size, _items):
 		self = super(PSequence, cls).__new__(cls)
@@ -84,7 +95,7 @@ class PSequence(PSequenceBase):
 			middle._appendright(PSequence._nodeS(*right._items[:3])),
 			PSequence._digitS(right._items[3], item))
 
-	def appendright(self, value):
+	def appendright(self, value:T) -> PSequence[T]:
 		return self._appendright(PSequence._node1(value))
 
 	append = appendright
@@ -107,24 +118,24 @@ class PSequence(PSequenceBase):
 			middle._appendleft(PSequence._nodeS(*left._items[1:])),
 			right)
 
-	def appendleft(self, value):
+	def appendleft(self, value:T) -> PSequence[T]:
 		return self._appendleft(PSequence._node1(value))
 
 	@property
-	def right(self):
+	def right(self) -> T:
 		if self._size == 0:
 			raise IndexError('peek from empty sequence')
 		if len(self._items) == 1:
-			return self._items[0]._items[0]
-		return self._items[2]._items[-1]._items[0]
+			return cast(T, self._items[0]._items[0])
+		return cast(T, self._items[2]._items[-1]._items[0])
 
 	@property
-	def left(self):
+	def left(self) -> T:
 		if self._size == 0:
 			raise IndexError('peek from empty sequence')
 		if len(self._items) == 1:
-			return self._items[0]._items[0]
-		return self._items[0]._items[0]._items[0]
+			return cast(T, self._items[0]._items[0])
+		return cast(T, self._items[0]._items[0]._items[0])
 
 	def _pullright(self, left):
 		if self._size == 0:
@@ -143,7 +154,7 @@ class PSequence(PSequenceBase):
 			PSequence._digit(right._size - last._size, *init))
 		return init, last
 
-	def viewright(self):
+	def viewright(self) -> Tuple[PSequence[T], T]:
 		if self._size == 0:
 			raise IndexError('peek from empty sequence')
 		init, last =  self._viewright()
@@ -166,14 +177,15 @@ class PSequence(PSequenceBase):
 			PSequence._digit(left._size - head._size, *tail),
 			middle, right)
 
-	def viewleft(self):
+	def viewleft(self) -> Tuple[T, PSequence[T]]:
 		if self._size == 0:
 			raise IndexError('peek from empty sequence')
 		head, tail =  self._viewleft()
 		return head._items[0], tail
 
-	def view(self, *index):
-		items, last, rest = [], 0, self
+	def view(self, *index:int) -> Tuple[Union[T, PSequence[T]], ...]:
+		items: List[Union[T, PSequence[T]]] = []
+		last, rest = 0, self
 		for idx in index:
 			idx = self._checkindex(idx)
 			if idx < last: raise IndexError('indices must be in sorted order')
@@ -228,7 +240,7 @@ class PSequence(PSequenceBase):
 		right1 = PSequence._fromnodes(sizeR, itemsR)
 		return left1, item, right1
 
-	def splitat(self, index):
+	def splitat(self, index:int) -> Tuple[PSequence[T], PSequence[T]]:
 		try: index = self._checkindex(index)
 		except IndexError:
 			if index < 0: return EMPTY_SEQUENCE, self
@@ -333,18 +345,18 @@ class PSequence(PSequenceBase):
 		return PSequence._deep(self._size + other._size,
 			left1, middle1._extend(middle2), right2)
 
-	def extendright(self, other):
+	def extendright(self, other:Union[PSequence[T], Iterable[T]]) -> PSequence[T]:
 		return self._extend(psequence(other))
 
 	extend = extendright
 	__add__ = extendright
 
-	def extendleft(self, other):
+	def extendleft(self, other:Union[PSequence[T], Iterable[T]]) -> PSequence[T]:
 		return psequence(other)._extend(self)
 
 	__radd__ = extendleft
 
-	def reverse(self):
+	def reverse(self) -> PSequence[T]:
 		if self._isnode1(): return self
 		return PSequence(self._type, self._size,
 			tuple(i.reverse() for i in reversed(self._items)))
@@ -383,6 +395,10 @@ class PSequence(PSequenceBase):
 			modulo, count = item._getslice(modulo, count, step, output)
 		return modulo, count
 
+	@overload
+	def __getitem__(self, index:int) -> T: ...
+	@overload
+	def __getitem__(self, index:slice) -> PSequence[T]: ...
 	def __getitem__(self, index):
 		if isinstance(index, slice):
 			start, stop, step, count = PSequence._sliceindices(index, self._size)
@@ -420,6 +436,10 @@ class PSequence(PSequenceBase):
 			items.append(item)
 		return PSequence(self._type, self._size, tuple(items)), modulo, count
 
+	@overload
+	def set(self, index:int, value:T) -> PSequence[T]: ...
+	@overload
+	def set(self, index:slice, value:Iterable[T]) -> PSequence[T]: ...
 	def set(self, index, value):
 		if isinstance(index, slice):
 			start, stop, step, count = self._sliceindices(index, self._size)
@@ -453,8 +473,9 @@ class PSequence(PSequenceBase):
 			items.append(item)
 		return index, PSequence(self._type, self._size, tuple(items))
 
-	def mset(self, *args):
-		pairs, args = [], iter(args)
+	def mset(self, *items:Union[int,T,Tuple[int,T]]) -> PSequence[T]:
+		pairs: List[Tuple[int,T]] = []
+		args = iter(items)
 		for arg in args:
 			if isinstance(arg, tuple):
 				index, value = arg
@@ -536,7 +557,11 @@ class PSequence(PSequenceBase):
 			acc += chunk
 		return acc + rest
 
-	def delete(self, index):
+	@overload
+	def delete(self, index:int) -> PSequence[T]: ...
+	@overload
+	def delete(self, index:slice) -> PSequence[T]: ...
+	def delete(self, index) -> PSequence[T]:
 		if isinstance(index, slice):
 			start, stop, step, count = self._sliceindices(index, self._size)
 			if count == 0: return self
@@ -577,33 +602,34 @@ class PSequence(PSequenceBase):
 			middle._appendright(PSequence._nodeS(*meld[:3])),
 			PSequence._digitS(*meld[3:])), None
 
-	def insert(self, index, value):
+	def insert(self, index:int, value:T) -> PSequence[T]:
 		try: index = self._checkindex(index)
 		except IndexError:
 			if index < 0: return self.appendleft(value)
 			return self.appendright(value)
 		return self._insert(index, PSequence._node1(value))[0]
 
-	def remove(self, value):
+	def remove(self, value:T) -> PSequence[T]:
 		return self.delete(self.index(value))
 
-	def transform(self, *transformations):
+	def transform(self, *transformations) -> PSequence[T]:
 		from pyrsistent._transformations import transform
 		return transform(self, transformations)
 
-	def index(self, value):
-		for n, x in enumerate(self):
-			if value == x: return n
+	def index(self, value, start:int=0, stop:int=cast(int,None)) -> int:
+		if stop is None: stop = self._size
+		for n, x in enumerate(self[start:stop]):
+			if value == x: return n + start
 		raise ValueError('value not in sequence');
 
-	def count(self, value):
+	def count(self, value:T) -> int:
 		count = 0
 		for x in self:
 			if value == x:
 				count += 1
 		return count
 
-	def chunksof(self, size):
+	def chunksof(self, size:int) -> PSequence[Sequence[T]]:
 		acc = []
 		while self._size != 0:
 			chunk, self = self.splitat(size)
@@ -613,7 +639,15 @@ class PSequence(PSequenceBase):
 	def __reduce__(self):
 		return psequence, (self.tolist(),)
 
-	def __hash__(self):
+	def __hash__(self) -> int:
+		r'''
+		:math:`O(n)`. Calculate the hash of the sequence.
+
+		>>> x1 = psequence([1,2,3,4])
+		>>> x2 = psequence([1,2,3,4])
+		>>> hash(x1) == hash(x2)
+		True
+		'''
 		return hash(self.totuple())
 
 	def _tolist(self, acc):
@@ -624,13 +658,13 @@ class PSequence(PSequenceBase):
 				item._tolist(acc)
 		return acc
 
-	def tolist(self):
+	def tolist(self) -> List[T]:
 		return self._tolist([])
 
-	def totuple(self):
+	def totuple(self) -> Tuple[T, ...]:
 		return tuple(self.tolist())
 
-	def __mul__(self, times):
+	def __mul__(self, times:int) -> PSequence[T]:
 		if times <= 0: return EMPTY_SEQUENCE
 		acc, exp = EMPTY_SEQUENCE, self
 		while times != 0:
@@ -642,40 +676,40 @@ class PSequence(PSequenceBase):
 
 	__rmul__ = __mul__
 
-	def __len__(self):
+	def __len__(self) -> int:
 		return self._size
 
-	def __eq__(self, other):
+	def __eq__(self, other) -> bool:
 		result = compare_iter(self, other, True)
-		if result is NotImplemented: return result
+		if result is NotImplemented: return NotImplemented
 		return result == 0
-	def __ne__(self, other):
+	def __ne__(self, other) -> bool:
 		result = compare_iter(self, other, True)
-		if result is NotImplemented: return result
+		if result is NotImplemented: return NotImplemented
 		return result != 0
-	def __gt__(self, other):
+	def __gt__(self, other) -> bool:
 		result = compare_iter(self, other, False)
-		if result is NotImplemented: return result
+		if result is NotImplemented: return NotImplemented
 		return result > 0
-	def __ge__(self, other):
+	def __ge__(self, other) -> bool:
 		result = compare_iter(self, other, False)
-		if result is NotImplemented: return result
+		if result is NotImplemented: return NotImplemented
 		return result >= 0
-	def __lt__(self, other):
+	def __lt__(self, other) -> bool:
 		result = compare_iter(self, other, False)
-		if result is NotImplemented: return result
+		if result is NotImplemented: return NotImplemented
 		return result < 0
-	def __le__(self, other):
+	def __le__(self, other) -> bool:
 		result = compare_iter(self, other, False)
-		if result is NotImplemented: return result
+		if result is NotImplemented: return NotImplemented
 		return result <= 0
 
-	def __repr__(self):
+	def __repr__(self) -> str:
 		return 'psequence({})'.format(list(self))
 
 	__str__ = __repr__
 
-	def sort(self, *args, **kwargs):
+	def sort(self, *args, **kwargs) -> PSequence[T]:
 		xs = self.tolist()
 		xs.sort(*args, **kwargs)
 		return psequence(xs)
@@ -698,24 +732,24 @@ class PSequence(PSequenceBase):
 	def _refcount():
 		return 0, 0, 0
 
-	def evolver(self):
+	def evolver(self) -> Evolver[T]:
 		return Evolver(self)
 
-	def __iter__(self):
+	def __iter__(self) -> Iterator[T]:
 		if self._isnode1():
-			yield self._items[0]
+			yield cast(T, self._items[0])
 			return
 		for item in self._items:
 			yield from item
 
-	def __reversed__(self):
+	def __reversed__(self) -> Iterator[T]:
 		if self._isnode1():
-			yield self._items[0]
+			yield cast(T, self._items[0])
 			return
 		for item in reversed(self._items):
 			yield from reversed(item)
 
-class Evolver(PSequenceEvolverBase):
+class Evolver(PSequenceEvolverBase[T]):
 	__slots__ = ('_seq',)
 
 	def __init__(self, _seq):
@@ -730,85 +764,155 @@ class Evolver(PSequenceEvolverBase):
 	__str__ = __repr__
 
 	@property
-	def left(self):
+	def left(self) -> T:
 		return self._seq.left
 
 	@property
-	def right(self):
+	def right(self) -> T:
 		return self._seq.right
 
-	def popleft(self):
+	def popleft(self) -> T:
 		value, self._seq = self._seq.viewleft()
 		return value
 
-	def popright(self):
+	def popright(self) -> T:
 		self._seq, value = self._seq.viewright()
 		return value
 
+	@overload
+	def pop(self, index:Optional[int]=None) -> T: ...
+	@overload
+	def pop(self, index:slice) -> PSequence[T]: ...
 	def pop(self, index=None):
 		if index is None: return self.popright()
 		value = self[index]
 		self.delete(index)
 		return value
 
-	def copy(self):
+	def copy(self) -> Evolver[T]:
 		return self._seq.evolver()
 
 	evolver = copy
 
-	def clear(self):
+	def clear(self) -> Evolver[T]:
 		self._seq = EMPTY_SEQUENCE
+		return self
 
-	def __iadd__(self, other):
+	def __iadd__(self, other:Union[PSequence[T], Iterable[T]]) -> Evolver[T]:
 		self._seq = self._seq + other
 		return self
 
-	def __imul__(self, other):
+	def __imul__(self, other:int) -> Evolver[T]:
 		self._seq = self._seq * other
 		return self
 
 	# methods that query the sequence
-	for _name in ['tolist', 'totuple', 'chunksof', 'count', 'index',
-			'splitat', 'view', 'viewleft', 'viewright',
-			'__eq__', '__ne__', '__ge__', '__gt__', '__le__', '__lt__',
-			'__reduce__', '__getitem__', '__len__',
-			'__iter__', '__reversed__', '_totree']:
-		def _wrap(_name): # type: ignore
-			func = getattr(PSequence, _name)
-			@wraps(func)
-			def _wrapper(self, *args, **kwargs):
-				return func(self._seq, *args, **kwargs)
-			return _wrapper
-		locals()[_name] = _wrap(_name) # type: ignore
+	def tolist(self) -> List[T]:
+		return self._seq.tolist()
+	def totuple(self) -> Tuple[T, ...]:
+		return self._seq.totuple()
+	def chunksof(self, size:int) -> PSequence[Sequence[T]]:
+		return self._seq.chunksof(size)
+	def count(self, value:T) -> int:
+		return self._seq.count(value)
+	def index(self, value, start:int=0, stop:int=cast(int,None)) -> int:
+		return self._seq.index(value, start, stop)
+	def splitat(self, index:int) -> Tuple[PSequence[T], PSequence[T]]:
+		return self._seq.splitat(index)
+	def view(self, *index:int) -> Tuple[Union[T, PSequence[T]], ...]:
+		return self._seq.view(*index)
+	def viewleft(self) -> Tuple[T, PSequence[T]]:
+		return self._seq.viewleft()
+	def viewright(self) -> Tuple[PSequence[T], T]:
+		return self._seq.viewright()
+	def __eq__(self, other) -> bool:
+		return self._seq.__eq__(other)
+	def __ne__(self, other) -> bool:
+		return self._seq.__ne__(other)
+	def __ge__(self, other) -> bool:
+		return self._seq.__ge__(other)
+	def __gt__(self, other) -> bool:
+		return self._seq.__gt__(other)
+	def __le__(self, other) -> bool:
+		return self._seq.__le__(other)
+	def __lt__(self, other) -> bool:
+		return self._seq.__lt__(other)
+	def __reduce__(self):
+		return self._seq.__reduce__()
+	@overload
+	def __getitem__(self, index:int) -> T: ...
+	@overload
+	def __getitem__(self, index:slice) -> PSequence[T]: ...
+	def __getitem__(self, index):
+		return self._seq.__getitem__(index)
+	def __len__(self) -> int:
+		return self._seq.__len__()
+	def __iter__(self) -> Iterator[T]:
+		return self._seq.__iter__()
+	def __reversed__(self) -> Iterator[T]:
+		return self._seq.__reversed__()
+	def _totree(self):
+		return self._seq._totree()
 
 	# methods that create a new evolver
-	for _name in ['__mul__', '__rmul__', '__add__', '__radd__']:
-		def _wrap(_name): # type: ignore
-			func = getattr(PSequence, _name)
-			@wraps(func)
-			def _wrapper(self, *args, **kwargs):
-				return Evolver(func(self._seq, *args, **kwargs))
-			return _wrapper
-		locals()[_name] = _wrap(_name) # type: ignore
+	def __mul__(self, times:int) -> Evolver[T]:
+		return Evolver(self._seq.__mul__(times))
+	__rmul__ = __mul__
+	def __add__(self, other:Union[PSequence[T], Iterable[T]]) -> Evolver[T]:
+		return Evolver(self._seq.__add__(other))
+	__radd__ = __add__
 
 	# methods that modify the evolver
-	for _name in ['reverse', 'transform',
-			'append', 'appendright', 'appendleft',
-			'extend', 'extendleft', 'extendright',
-			'set', 'mset', 'insert', 'delete', 'remove', 'sort']:
-		def _wrap(_name): # type: ignore
-			func = getattr(PSequence, _name)
-			@wraps(func)
-			def _wrapper(self, *args, **kwargs):
-				self._seq = func(self._seq, *args, **kwargs)
-				return self
-			return _wrapper
-		locals()[_name] = _wrap(_name) # type: ignore
-
+	def reverse(self) -> Evolver[T]:
+		self._seq = self._seq.reverse()
+		return self
+	def transform(self, *transformations) -> Evolver[T]:
+		self._seq = self._seq.transform(*transformations)
+		return self
+	def appendleft(self, value:T) -> Evolver[T]:
+		self._seq = self._seq.appendleft(value)
+		return self
+	def appendright(self, value:T) -> Evolver[T]:
+		self._seq = self._seq.appendright(value)
+		return self
+	append = appendright
+	def extendleft(self, other:Union[PSequence[T], Iterable[T]]) -> Evolver[T]:
+		self._seq = self._seq.extendleft(other)
+		return self
+	def extendright(self, other:Union[PSequence[T], Iterable[T]]) -> Evolver[T]:
+		self._seq = self._seq.extendright(other)
+		return self
+	extend = extendright
+	@overload
+	def set(self, index:int, value:T) -> Evolver[T]: ...
+	@overload
+	def set(self, index:slice, value:Iterable[T]) -> Evolver[T]: ...
+	def set(self, index, value):
+		self._seq = self._seq.set(index, value)
+		return self
 	__setitem__ = set
-	__delitem__ = delete # type: ignore
+	def mset(self, *items:Union[int,T,Tuple[int,T]]) -> Evolver[T]:
+		self._seq = self._seq.mset(*items)
+		return self
+	def insert(self, index:int, value:T) -> Evolver[T]:
+		self._seq = self._seq.insert(index, value)
+		return self
+	@overload
+	def delete(self, index:int) -> Evolver[T]: ...
+	@overload
+	def delete(self, index:slice) -> Evolver[T]: ...
+	def delete(self, index):
+		self._seq = self._seq.delete(index)
+		return self
+	__delitem__ = delete
+	def remove(self, value:T) -> Evolver[T]:
+		self._seq = self._seq.remove(value)
+		return self
+	def sort(self, *args, **kwargs) -> Evolver[T]:
+		self._seq = self._seq.sort(*args, **kwargs)
+		return self
 
-EMPTY_SEQUENCE = PSequence(PSequence._Type.Tree, 0, tuple())
+EMPTY_SEQUENCE: PSequence[Any] = PSequence(PSequence._Type.Tree, 0, tuple())
 
 def psequence(iterable=EMPTY_SEQUENCE):
 	if isinstance(iterable, Evolver): return iterable._seq
