@@ -5,27 +5,21 @@ import platform
 import codecs
 from distutils.command.build_ext import build_ext
 
-if platform.system() != 'Windows':
-    readme_path = os.path.join(os.path.dirname(__file__), 'README.rst')
-    with codecs.open(readme_path, encoding='utf8') as f:
-        readme = f.read()
-else:
-    # The format is messed up with extra line breaks when building wheels on windows.
-    # Skip readme in this case.
-    readme = 'Persistent collections, see https://github.com/tobgu/pyrsistent/ for details.'
+readme_path = os.path.join(os.path.dirname(__file__), 'README.rst')
+with codecs.open(readme_path, encoding='utf8') as f:
+    readme = f.read()
 
 extensions = []
 if platform.python_implementation() == 'CPython' and os.getenv('PYRSISTENT_SKIP_EXTENSION') is None:
     extensions = [
         setuptools.Extension(
             'pyrsistent_extras._psequence._c_ext',
-            sources=['pyrsistent_extras/psequence/_c_ext.c']
+            sources=['pyrsistent_extras/_psequence/_c_ext.c'],
         ),
     ]
 
 needs_pytest = {'pytest', 'test', 'ptr'}.intersection(sys.argv)
 pytest_runner = ['pytest-runner'] if needs_pytest else []
-
 
 class custom_build_ext(build_ext):
     '''Allow C extension building to fail.'''
