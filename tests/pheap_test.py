@@ -1,4 +1,4 @@
-from pyrsistent_extras._pheap import \
+from pyrsistent_extras import \
 	hl, pminheap, PMinHeap, hg, pmaxheap, PMaxHeap
 
 import hypothesis

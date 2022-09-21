@@ -29,7 +29,8 @@ class PSequenceBase(Generic[T]):
 	Do not instantiate directly, instead use the factory
 	functions :func:`sq` or :func:`psequence` to create an instance.
 
-	The PSequence implements the Sequence protocol and is Hashable.
+	The :class:`PSequence` implements the :class:`python:typing.Sequence`
+	protocol and is :class:`python:typing.Hashable`.
 
 	Most operations are a constant factor (around 2x-3x) slower than the
 	equivalent list operation. However, some are asymptotically faster:
@@ -74,81 +75,93 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def __eq__(self, other) -> bool:
 		r'''
-		:math:`O(n)`. Return self == other.
+		Return self == other
 
-		 >>> psequence([1,2,3]) == psequence([1,2,3])
-		 True
-		 >>> psequence([1,2,3]) == psequence([2,3,4])
-		 False
+		:math:`O(n)`
+
+		>>> psequence([1,2,3]) == psequence([1,2,3])
+		True
+		>>> psequence([1,2,3]) == psequence([2,3,4])
+		False
 		'''
 
 	@abstractmethod
 	def __ne__(self, other) -> bool:
 		r'''
-		:math:`O(n)`. Return self != other.
+		Return self != other
 
-		 >>> psequence([1,2,3]) != psequence([1,2,3])
-		 False
-		 >>> psequence([1,2,3]) != psequence([2,3,4])
-		 True
+		:math:`O(n)`
+
+		>>> psequence([1,2,3]) != psequence([1,2,3])
+		False
+		>>> psequence([1,2,3]) != psequence([2,3,4])
+		True
 		'''
 
 	@abstractmethod
 	def __le__(self, other) -> bool:
 		r'''
-		:math:`O(n)`. Return self <= other.
+		Return self <= other
 
-		 >>> psequence([1,2,3]) <= psequence([1,2,3])
-		 True
-		 >>> psequence([1,2,3]) <= psequence([2,3,4])
-		 True
-		 >>> psequence([1,2,3]) <= psequence([0,1,2])
-		 False
+		:math:`O(n)`
+
+		>>> psequence([1,2,3]) <= psequence([1,2,3])
+		True
+		>>> psequence([1,2,3]) <= psequence([2,3,4])
+		True
+		>>> psequence([1,2,3]) <= psequence([0,1,2])
+		False
 		'''
 
 	@abstractmethod
 	def __lt__(self, other) -> bool:
 		r'''
-		:math:`O(n)`. Return self < other.
+		Return self < other
 
-		 >>> psequence([1,2,3]) < psequence([1,2,3])
-		 False
-		 >>> psequence([1,2,3]) < psequence([2,3,4])
-		 True
-		 >>> psequence([1,2,3]) < psequence([0,1,2])
-		 False
+		:math:`O(n)`
+
+		>>> psequence([1,2,3]) < psequence([1,2,3])
+		False
+		>>> psequence([1,2,3]) < psequence([2,3,4])
+		True
+		>>> psequence([1,2,3]) < psequence([0,1,2])
+		False
 		'''
 
 	@abstractmethod
 	def __ge__(self, other) -> bool:
 		r'''
-		:math:`O(n)`. Return self >= other.
+		Return self >= other
 
-		 >>> psequence([1,2,3]) >= psequence([1,2,3])
-		 True
-		 >>> psequence([1,2,3]) >= psequence([2,3,4])
-		 False
-		 >>> psequence([1,2,3]) >= psequence([0,1,2])
-		 True
+		:math:`O(n)`
+
+		>>> psequence([1,2,3]) >= psequence([1,2,3])
+		True
+		>>> psequence([1,2,3]) >= psequence([2,3,4])
+		False
+		>>> psequence([1,2,3]) >= psequence([0,1,2])
+		True
 		'''
 
 	@abstractmethod
 	def __gt__(self, other) -> bool:
 		r'''
-		:math:`O(n)`. Return self > other.
+		Return self > other
 
-		 >>> psequence([1,2,3]) > psequence([1,2,3])
-		 False
-		 >>> psequence([1,2,3]) > psequence([2,3,4])
-		 False
-		 >>> psequence([1,2,3]) > psequence([0,1,2])
-		 True
+		:math:`O(n)`
+
+		>>> psequence([1,2,3]) > psequence([1,2,3])
+		False
+		>>> psequence([1,2,3]) > psequence([2,3,4])
+		False
+		>>> psequence([1,2,3]) > psequence([0,1,2])
+		True
 		'''
 
 	@abstractmethod
 	def extendleft(self, other:Union[PSequenceBase[T], Iterable[T]]) -> PSequenceBase[T]:
 		r'''
-		Concatenate two sequences.
+		Concatenate two sequences
 
 		:math:`O(\log(\min(n,k)))` extend with :class:`PSequence`
 
@@ -161,7 +174,7 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def extendright(self, other:Union[PSequenceBase[T], Iterable[T]]) -> PSequenceBase[T]:
 		r'''
-		Concatenate two sequences.
+		Concatenate two sequences
 
 		:math:`O(\log(\min(n,k)))` extend with PSequence
 
@@ -179,7 +192,7 @@ class PSequenceBase(Generic[T]):
 
 	def __add__(self, other:Union[PSequenceBase[T], Iterable[T]]) -> PSequenceBase[T]:
 		r'''
-		Concatenate two sequences.
+		Concatenate two sequences
 
 		:math:`O(\log(\min(n,k)))` extend with PSequence
 
@@ -199,13 +212,15 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def __getitem__(self, index):
 		r'''
-		Get the element(s) at the specified position(s).
+		Get the element(s) at the specified position(s)
 
 		Time complexities for `n[i]`:
 
-			- :math:`O(\log(\min(i,n−i)))` getting a single item.
-			- :math:`O(\log(\max(i,m)))` getting a contiguous slice.
-			- :math:`O(\log{n}+m)` getting a non-contiguous slice.
+		- :math:`O(\log(\min(i,n−i)))` getting a single item.
+		- :math:`O(\log(\max(i,m)))` getting a contiguous slice.
+		- :math:`O(\log{n}+m)` getting a non-contiguous slice.
+
+		:raises IndexError: if the index is out of bounds
 
 		>>> psequence([1,2,3,4])[2]
 		3
@@ -224,13 +239,15 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def set(self, index, value):
 		r'''
-		Replace the element(s) at the specified position(s).
+		Replace the element(s) at the specified position(s)
 
 		Time complexities for `n.set(i,x)`:
 
-			- :math:`O(\log(\min(i,n−i)))` replacing a single item.
-			- :math:`O(\log(\max(n,x)))` replacing a contiguous slice.
-			- :math:`O(x)` replacing a non-contiguous slice.
+		- :math:`O(\log(\min(i,n−i)))` replacing a single item.
+		- :math:`O(\log(\max(n,x)))` replacing a contiguous slice.
+		- :math:`O(x)` replacing a non-contiguous slice.
+
+		:raises IndexError: if the index is out of bounds
 
 		>>> psequence([1,2,3,4]).set(2, 0)
 		psequence([1, 2, 0, 4])
@@ -245,7 +262,11 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def mset(self, *values:Tuple[int,T]) -> PSequenceBase[T]:
 		r'''
-		:math:`O(n+k\log{k})`. Replace multiple elements.
+		Replace multiple elements
+
+		:math:`O(k\log{n}+k\log{k})`
+
+		:raises IndexError: if any index is out of bounds
 
 		>>> psequence([1,2,3,4]).mset(2, 0, 3, 5)
 		psequence([1, 2, 0, 5])
@@ -260,7 +281,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def insert(self, index:int, value:T) -> PSequenceBase[T]:
 		r'''
-		:math:`O(\log(\min(i,n−i)))`. Insert an element at the specified position.
+		Insert an element at the specified position
+
+		:math:`O(\log(\min(i,n−i)))`
 
 		>>> psequence([1,2,3,4]).insert(2, 0)
 		psequence([1, 2, 0, 3, 4])
@@ -277,13 +300,15 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def delete(self, index) -> PSequenceBase[T]:
 		r'''
-		Delete the element(s) at the specified position(s).
+		Delete the element(s) at the specified position(s)
 
 		Time complexities for `n.delete(i)`:
 
-			- :math:`O(\log(\min(i,n−i)))` deleting a single item.
-			- :math:`O(\log{n})` deleting a contiguous slice.
-			- :math:`O(\frac{n}{k}\log{k})` deleting a non-contiguous slice.
+		- :math:`O(\log(\min(i,n−i)))` deleting a single item.
+		- :math:`O(\log{n})` deleting a contiguous slice.
+		- :math:`O(\frac{n}{k}\log{k})` deleting a non-contiguous slice.
+
+		:raises IndexError: if the index is out of bounds
 
 		>>> psequence([1,2,3,4]).delete(2)
 		psequence([1, 2, 4])
@@ -298,7 +323,11 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def remove(self, value:T) -> PSequenceBase[T]:
 		r'''
-		:math:`O(n)`. Remove an element by value.
+		Remove an element by value
+
+		:math:`O(n)`
+
+		:raises ValueError: if the value is not in the sequence
 
 		>>> psequence([1,2,3,4]).remove(2)
 		psequence([1, 3, 4])
@@ -311,7 +340,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def __mul__(self, times:int) -> PSequenceBase[T]:
 		r'''
-		:math:`O(\log{n}\log{k})`. Repeat the sequence k times.
+		Repeat the sequence k times
+
+		:math:`O(\log{n}\log{k})`
 
 		>>> psequence([1,2,3]) * 3
 		psequence([1, 2, 3, 1, 2, 3, 1, 2, 3])
@@ -324,7 +355,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def __iter__(self) -> Iterator[T]:
 		r'''
-		:math:`O(1)`. Create an iterator.
+		Create an iterator
+
+		:math:`O(1)`
 
 		Iterating the entire sequence is :math:`O(n)`.
 
@@ -344,7 +377,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def __reversed__(self) -> Iterator[T]:
 		r'''
-		:math:`O(1)`. Create a reverse iterator.
+		Create a reverse iterator
+
+		:math:`O(1)`
 
 		Iterating the entire sequence is :math:`O(n)`.
 
@@ -364,27 +399,32 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def __len__(self) -> int:
 		r'''
-		:math:`O(1)`. Get the length of the sequence.
+		Get the length of the sequence
+
+		:math:`O(1)`
 
 		>>> len(psequence([1,2,3,4]))
 		4
 		'''
 
-
 	@abstractmethod
 	def __reduce__(self):
 		r'''
-		:math:`O(n)`. Support method for pickling.
+		Support method for :mod:`python:pickle`
 
-		>>> func, args = psequence([1,2,3,4]).__reduce__()
-		>>> func(*args)
+		:math:`O(n)`
+
+		>>> import pickle
+		>>> pickle.loads(pickle.dumps(psequence([1,2,3,4])))
 		psequence([1, 2, 3, 4])
 		'''
 
 	@abstractmethod
 	def __repr__(self) -> str:
 		r'''
-		:math:`O(n)`. Get a formatted string representation of the sequence.
+		Get a formatted string representation
+
+		:math:`O(n)`
 
 		>>> repr(psequence([1,2,3]))
 		'psequence([1, 2, 3])'
@@ -395,7 +435,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def appendleft(self, value:T) -> PSequenceBase[T]:
 		r'''
-		:math:`O(1)`. Add an element to the left end of a sequence.
+		Add an element to the left end
+
+		:math:`O(1)`
 
 		>>> psequence([1,2,3]).appendleft(0)
 		psequence([0, 1, 2, 3])
@@ -404,7 +446,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def appendright(self, value:T) -> PSequenceBase[T]:
 		r'''
-		:math:`O(1)`. Add an element to the right end of a sequence.
+		Add an element to the right end
+
+		:math:`O(1)`
 
 		>>> psequence([1,2,3]).append(4)
 		psequence([1, 2, 3, 4])
@@ -417,7 +461,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def count(self, value:T) -> int:
 		r'''
-		:math:`O(n)`. Count the number of times a value appears in the sequence.
+		Count the number of times a value appears
+
+		:math:`O(n)`
 
 		>>> psequence([1,2,3,3,4]).count(3)
 		2
@@ -426,7 +472,11 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def index(self, value, start:int=0, stop:int=0) -> int:
 		r'''
-		:math:`O(n)`. Find the first index of a value.
+		Find the first index of a value
+
+		:math:`O(n)`
+
+		:raises ValueError: if the value is not in the sequence
 
 		>>> psequence([1,2,3,4]).index(3)
 		2
@@ -439,7 +489,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def splitat(self, index:int) -> Tuple[PSequenceBase[T], PSequenceBase[T]]:
 		r'''
-		:math:`O(\log(\min(i,n−i)))`. Split a sequence at a given position.
+		Split a sequence at a given position
+
+		:math:`O(\log(\min(i,n−i)))`
 
 		Equivalent to ``(seq.take(i), seq.drop(i))``.
 		Does not raise :exc:`python:IndexError`, unlike :meth:`view`.
@@ -457,7 +509,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def chunksof(self, size:int) -> PSequenceBase[Sequence[T]]:
 		r'''
-		:math:`O(\frac{n}{k}\log{n})`. Split the sequence into chunks.
+		Split the sequence into chunks
+
+		:math:`O(\frac{n}{k}\log{n})`
 
 		>>> psequence([1,2,3,4,5,6,7,8]).chunksof(3)
 		psequence([psequence([1, 2, 3]), psequence([4, 5, 6]), psequence([7, 8])])
@@ -467,7 +521,11 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def left(self) -> T:
 		r'''
-		:math:`O(1)`. Extract the first element.
+		Extract the first element
+
+		:math:`O(1)`
+
+		:raises IndexError: if the sequence is empty
 
 		>>> psequence([1,2,3,4]).left
 		1
@@ -481,7 +539,11 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def right(self) -> T:
 		r'''
-		:math:`O(1)`. Extract the last element.
+		Extract the last element
+
+		:math:`O(1)`
+
+		:raises IndexError: if the sequence is empty
 
 		>>> psequence([1,2,3,4]).right
 		4
@@ -494,7 +556,11 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def viewleft(self) -> Tuple[T, PSequenceBase[T]]:
 		r'''
-		:math:`O(1)`. Analyse the left end of a sequence.
+		Analyse the left end
+
+		:math:`O(1)`
+
+		:raises IndexError: if the sequence is empty
 
 		>>> psequence([1,2,3,4]).viewleft()
 		(1, psequence([2, 3, 4]))
@@ -507,7 +573,11 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def viewright(self) -> Tuple[PSequenceBase[T], T]:
 		r'''
-		:math:`O(1)`. Analyse the right end of a sequence.
+		Analyse the right end
+
+		:math:`O(1)`
+
+		:raises IndexError: if the sequence is empty
 
 		>>> psequence([1,2,3,4]).viewright()
 		(psequence([1, 2, 3]), 4)
@@ -520,7 +590,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def view(self, *index:int) -> Tuple[Union[T, PSequenceBase[T]], ...]:
 		r'''
-		:math:`O(k\log{n})`. Split a sequence on the given position(s).
+		Split a sequence on the given position(s)
+
+		:math:`O(k\log{n})`
 
 		Useful for pattern matching:
 
@@ -531,6 +603,8 @@ class PSequenceBase(Generic[T]):
 
 		Equivalent to ``(seq[:i1], seq[i1], seq[i1+1:i2],
 		seq[i2], seq[i2+1:i3], ..., seq[in+1:])``.
+
+		:raises IndexError: if any index is out of bounds
 
 		>>> psequence([1,2,3,4]).view(0)
 		(psequence([]), 1, psequence([2, 3, 4]))
@@ -547,7 +621,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def reverse(self) -> PSequenceBase[T]:
 		r'''
-		:math:`O(n)`. Reverse the sequence.
+		Reverse the sequence
+
+		:math:`O(n)`
 
 		>>> psequence([1,2,3,4]).reverse()
 		psequence([4, 3, 2, 1])
@@ -556,7 +632,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def tolist(self) -> List[T]:
 		r'''
-		:math:`O(n)`. Convert the sequence to a `list`.
+		Convert the sequence to a :class:`python:list`
+
+		:math:`O(n)`
 
 		>>> psequence([1,2,3,4]).tolist()
 		[1, 2, 3, 4]
@@ -565,7 +643,9 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def totuple(self) -> Tuple[T, ...]:
 		r'''
-		:math:`O(n)`. Convert the sequence to a `tuple`.
+		Convert the sequence to a :class:`python:tuple`
+
+		:math:`O(n)`
 
 		>>> psequence([1,2,3,4]).totuple()
 		(1, 2, 3, 4)
@@ -574,7 +654,7 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def transform(self, transformations) -> PSequenceBase[T]:
 		r'''
-		Apply one or more transformations.
+		Apply one or more transformations
 
 		>>> from pyrsistent import ny
 		>>> psequence([1,2,3,4]).transform([ny], lambda x: x*2)
@@ -584,64 +664,17 @@ class PSequenceBase(Generic[T]):
 	@abstractmethod
 	def evolver(self) -> PSequenceEvolverBase[T]:
 		r'''
-		Create an evolver for psequence.
+		Create an :class:`Evolver`
 
-		The evolver acts as a mutable view of the sequence with "transaction
-		like" semantics. No part of the underlying sequence is updated, it is
-		still fully immutable. Furthermore multiple evolvers created from the
-		same psequence do not interfere with each other.
-
-		You may want to use an evolver instead of working directly with the
-		psequence in the following cases:
-
-			- Multiple updates are done to the same sequence and the
-			  intermediate results are of no interest. In this case using an
-			  evolver may be easier to work with.
-			- You need to pass a sequence into a legacy function or a function
-			  that you have no control over which performs in place mutations
-			  of lists. In this case pass an evolver instance instead and then
-			  create a new psequence from the evolver once the function returns.
-
-		The following example illustrates a typical workflow when working with
-		evolvers:
-
-		Create the evolver and perform various mutating updates to it:
-
-		>>> seq1 = psequence([1,2,3,4,5])
-		>>> evo1 = seq1.evolver()
-		>>> evo1[1] = 22
-		>>> _ = evo1.append(6)
-		>>> _ = evo1.extend([7,8,9])
-		>>> evo1[8] += 1
-		>>> evo1
-		psequence([1, 22, 3, 4, 5, 6, 7, 8, 10]).evolver()
-
-		The underlying psequence remains the same:
-
-		>>> seq1
-		psequence([1, 2, 3, 4, 5])
-
-		The changes are kept in the evolver. An updated psequence can be
-		created using the persistent() function on the evolver.
-
-		>>> seq2 = evo1.persistent()
-		>>> seq2
-		psequence([1, 22, 3, 4, 5, 6, 7, 8, 10])
-
-		The new psequence will share data with the original psequence in the
-		same way that would have been done if only using operations on the
-		psequence.
-
-		>>> evo = psequence([1,2,3,4]).evolver()
-		>>> evo[2] = 0
-		>>> evo
-		psequence([1, 2, 0, 4]).evolver()
+		:math:`O(1)`
 		'''
 
 	@abstractmethod
 	def sort(self, *args, **kwargs) -> PSequenceBase[T]:
 		r'''
-		:math:`O(n\log{n})`. Created a sorted copy of the sequence.
+		Creat a sorted copy of the sequence
+
+		:math:`O(n\log{n})`
 
 		Arguments are the same as :meth:`python:list.sort`.
 
@@ -649,15 +682,84 @@ class PSequenceBase(Generic[T]):
 		psequence([1, 2, 3, 4])
 		'''
 
+	@staticmethod
+	@abstractmethod
+	def _fromitems(iterable:Optional[Iterable[T]]=None) -> PSequenceBase[T]:
+		r'''
+		Create a :class:`PSequence` from the given items
+
+		:math:`O(n)`
+
+		>>> psequence()
+		psequence([])
+		>>> psequence([1,2,3,4])
+		psequence([1, 2, 3, 4])
+		'''
+
 class PSequenceEvolverBase(PSequenceBase[T]):
 	r'''
-	Evolver for PSequence
+	Evolver for :class:`PSequence`
+
+	The evolver acts as a mutable view of the sequence with "transaction
+	like" semantics. No part of the underlying sequence is updated, it is
+	still fully immutable. Furthermore multiple evolvers created from the
+	same psequence do not interfere with each other.
+
+	You may want to use an evolver instead of working directly with
+	:class:`PSequence` in the following cases:
+
+	- Multiple updates are done to the same sequence and the
+	  intermediate results are of no interest. In this case using an
+	  evolver may be easier to work with.
+	- You need to pass a sequence into a legacy function or a function
+	  that you have no control over which performs in place mutations
+	  of lists. In this case pass an evolver instance instead and then
+	  create a new psequence from the evolver once the function returns.
+
+	The following example illustrates a typical workflow when working with
+	evolvers:
+
+	Create the evolver and perform various mutating updates to it:
+
+	>>> seq1 = psequence([1,2,3,4,5])
+	>>> evo1 = seq1.evolver()
+	>>> evo1[1] = 22
+	>>> _ = evo1.append(6)
+	>>> _ = evo1.extend([7,8,9])
+	>>> evo1[8] += 1
+	>>> evo1
+	psequence([1, 22, 3, 4, 5, 6, 7, 8, 10]).evolver()
+
+	The underlying psequence remains the same:
+
+	>>> seq1
+	psequence([1, 2, 3, 4, 5])
+
+	The changes are kept in the evolver. An updated psequence can be
+	created using the persistent() function on the evolver.
+
+	>>> seq2 = evo1.persistent()
+	>>> seq2
+	psequence([1, 22, 3, 4, 5, 6, 7, 8, 10])
+
+	The new psequence will share data with the original psequence in the
+	same way that would have been done if only using operations on the
+	sequence.
+
+	>>> evo = psequence([1,2,3,4]).evolver()
+	>>> evo[2] = 0
+	>>> evo
+	psequence([1, 2, 0, 4]).evolver()
 	'''
 
 	@abstractmethod
 	def popleft(self) -> T:
 		r'''
-		:math:`O(1)`. Remove the leftmost element.
+		Remove the leftmost element
+
+		:math:`O(1)`
+
+		:raises IndexError: if the sequence is empty
 
 		>>> seq = psequence([1,2,3,4]).evolver()
 		>>> seq.popleft()
@@ -673,7 +775,11 @@ class PSequenceEvolverBase(PSequenceBase[T]):
 	@abstractmethod
 	def popright(self) -> T:
 		r'''
-		:math:`O(1)`. Remove the rightmost element.
+		Remove the rightmost element
+
+		:math:`O(1)`
+
+		:raises IndexError: if the sequence is empty
 
 		>>> seq = psequence([1,2,3,4]).evolver()
 		>>> seq.popright()
@@ -693,9 +799,11 @@ class PSequenceEvolverBase(PSequenceBase[T]):
 	@abstractmethod
 	def pop(self, index=None):
 		r'''
-		Remove and return an element at the specified index.
+		Remove and return an element at the specified index
 
 		See `PSequence.delete` and `list.pop`.
+
+		:raises IndexError: if the sequence is empty or the index is out of bounds
 
 		>>> seq = psequence([1,2,3,4]).evolver()
 		>>> seq.pop()
@@ -711,7 +819,9 @@ class PSequenceEvolverBase(PSequenceBase[T]):
 	@abstractmethod
 	def copy(self) -> PSequenceEvolverBase[T]:
 		r'''
-		:math:`O(1)`. Return a shallow copy of the sequence.
+		Return a shallow copy of the sequence
+
+		:math:`O(1)`
 
 		>>> seq1 = psequence([1,2,3,4]).evolver()
 		>>> seq2 = seq1.copy()
@@ -725,7 +835,9 @@ class PSequenceEvolverBase(PSequenceBase[T]):
 	@abstractmethod
 	def clear(self) -> PSequenceEvolverBase[T]:
 		r'''
-		:math:`O(1)`. Remove all items from the sequence.
+		Remove all items from the sequence
+
+		:math:`O(1)`
 
 		>>> seq = psequence([1,2,3,4]).evolver()
 		>>> _ = seq.clear()
@@ -736,12 +848,17 @@ class PSequenceEvolverBase(PSequenceBase[T]):
 	@abstractmethod
 	def persistent(self) -> PSequenceBase[T]:
 		r'''
-		`O(1)`. Extract the sequence from the evolver.
+		Extract the sequence from the evolver
+
+		:math:`O(1)`
 
 		>>> seq = psequence([1,2,3,4])
 		>>> seq.evolver().persistent()
 		psequence([1, 2, 3, 4])
 		'''
+
+	@staticmethod
+	def _fromitems(iterable:Optional[Iterable[T]]=None) -> PSequenceBase[T]: ...
 
 # for doctest
 def psequence(*args, **kwargs):

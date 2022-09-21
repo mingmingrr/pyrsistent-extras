@@ -5,8 +5,9 @@ from abc import abstractmethod
 
 import itertools
 import operator
+import builtins
 
-from ._util import Comparable, compare_single, compare_next, compare_iter
+from ._util import Comparable, compare_next, compare_iter, sphinx_build
 
 T = TypeVar('T')
 K = TypeVar('K', bound=Comparable)
@@ -104,22 +105,47 @@ class Forest(Generic[K,V]):
 		return Forest.push(forest, down, self._order + 1,
 			self._tree.merge(other._tree, down))
 
-class HeapView(Generic[T,K,V], Collection[T]):
+class PHeapView(Generic[K,V,T], Collection[T]):
 	__slots__ = ('_queue', '_sorted')
 
-	_queue: Heap[K,V]
-	_sorted: bool
+	if not sphinx_build:
+		_queue: PHeap[K,V]
+		_sorted: bool
 
-	def __new__(cls, queue:Heap[K,V], sorted:bool):
+	def __new__(cls, _queue, _sorted):
 		self = super().__new__(cls)
-		self._queue = queue
-		self._sorted = sorted
+		self._queue = _queue
+		self._sorted = _sorted
 		return self
 
 	def __contains__(self, item):
+		r'''
+		Check if the item is in the heap
+
+		:math:`O(n)` or :math:`O(\log{n})`
+
+		>>> 1 in pminheap([(1,'a'), (2,'b'), (3,'c')]).keys()
+		True
+		>>> 'a' in pminheap([(1,'a'), (2,'b'), (3,'c')]).values()
+		True
+		>>> (1, 'a') in pminheap([(1,'a'), (2,'b'), (3,'c')]).items()
+		True
+		'''
 		return any(item == i for i in self)
 
 	def __len__(self):
+		r'''
+		Get the size of the heap
+
+		:math:`O(1)`
+
+		>>> len(pminheap([(1,'a'), (2,'b'), (3,'c')]).keys())
+		3
+		>>> len(pminheap([(1,'a'), (2,'b'), (3,'c')]).values())
+		3
+		>>> len(pminheap([(1,'a'), (2,'b'), (3,'c')]).items())
+		3
+		'''
 		return self._queue._size
 
 	def _iter_unsorted(self) -> Iterator[Tuple[K,V]]:
@@ -151,22 +177,34 @@ class HeapView(Generic[T,K,V], Collection[T]):
 		return self._iter_unsorted()
 
 	@abstractmethod
-	def __iter__(self) -> Iterator[T]: # pragma: no cover
+	def __iter__(self) -> Iterator[T]:
+		r'''
+		Iterate through the heap view
+
+		:math:`O(n)` or :math:`O(\log{n})`
+
+		>>> list(pminheap([(1,'a'), (2,'b'), (3,'c')]).keys())
+		[1, 2, 3]
+		>>> list(pminheap([(1,'a'), (2,'b'), (3,'c')]).values())
+		['a', 'b', 'c']
+		>>> list(pminheap([(1,'a'), (2,'b'), (3,'c')]).items())
+		[(1, 'a'), (2, 'b'), (3, 'c')]
+		'''
 		return NotImplemented
 
-class HeapItems(HeapView[Tuple[K,V],K,V]):
-	def __iter__(self) -> Iterator[Tuple[K,V]]:
-		return super()._iter()
-
-class HeapKeys(HeapView[K,K,V]):
+class PHeapKeys(PHeapView[K,V,K]):
 	def __iter__(self) -> Iterator[K]:
 		return (k for k, v in super()._iter())
 
-class HeapValues(HeapView[V,K,V]):
+class PHeapValues(PHeapView[K,V,V]):
 	def __iter__(self) -> Iterator[V]:
 		return (v for k, v in super()._iter())
 
-class Heap(Generic[K,V], Collection[K], Hashable):
+class PHeapItems(PHeapView[K,V,Tuple[K,V]]):
+	def __iter__(self) -> Iterator[Tuple[K,V]]:
+		return super()._iter()
+
+class PHeap(Generic[K,V], Collection[K], Hashable):
 	r'''
 	Persistent heap
 
@@ -176,20 +214,23 @@ class Heap(Generic[K,V], Collection[K], Hashable):
 	functions :func:`hl` or :func:`pminheap` to create a min-heap,
 	and :func:`hg` or :func:`pmaxheap` to create a max-heap.
 
-	The :class:`PMinHeap` and :class:`PMaxHeap` implements the
-	:class:`python:Container` protocol and is :class:`python:Hashable`.
+	The :class:`PMinHeap` and :class:`PMaxHeap` implements
+	the :class:`python:typing.Container` protocol
+	and is :class:`python:typing.Hashable`.
 
 	The implementation is a binomial heap.
-	Merge/push/pop operations are :math:`O(\log{n})`.
-	Operations are not stable - values pushed with the same key
+	Merge/pop operations are :math:`O(\log{n})`,
+	and peek/push operations are :math:`O(1)`.
+	Operations are not stable:
+	values pushed with the same key
 	may be popped in a different order.
 
 	The following are examples of some common operations on persistent heaps:
 
-	>>> heap1 = pminheap([(1, 'a'), (2, 'b')])
+	>>> heap1 = pminheap([(1,'a'), (2,'b')])
 	>>> heap1
 	pminheap([(1, 'a'), (2, 'b')])
-	>>> heap2 = heap1.push(3, 'c')
+	>>> heap2 = heap1.push(3,'c')
 	>>> heap2
 	pminheap([(1, 'a'), (2, 'b'), (3, 'c')])
 	>>> heap3 = heap1 + heap2
@@ -204,24 +245,35 @@ class Heap(Generic[K,V], Collection[K], Hashable):
 
 	__slots__ = ('_size', '_key', '_value', '_forest')
 
-	_size: int
-	_key: K
-	_value: V
-	_forest: Optional[Forest[K,V]]
+	if not sphinx_build:
+		_size: int
+		_key: K
+		_value: V
+		_forest: Optional[Forest[K,V]]
 
 	_name: ClassVar[str] = cast(Any, None)
 	_down: ClassVar[bool] = cast(Any, None)
-	_empty: ClassVar[Heap[Any,Any]] = cast(Any, None)
+	_empty: ClassVar[PHeap[Any,Any]] = cast(Any, None)
 
-	def __new__(cls, size:int, key:K, value:V, forest:Optional[Forest[K,V]]):
+	def __new__(cls, _size, _key, _value, _forest):
 		self = super().__new__(cls)
-		self._size = size
-		self._key = key
-		self._value = value
-		self._forest = forest
+		self._size = _size
+		self._key = _key
+		self._value = _value
+		self._forest = _forest
 		return self
 
-	def push(self, key:K, value:V=cast(V,None)) -> Heap[K,V]:
+	def push(self, key:K, value:V=cast(V,None)) -> PHeap[K,V]:
+		r'''
+		Inserts a value with the specified key
+
+		amortized :math:`O(1)`, worst case :math:`O(\log{n})`
+
+		>>> pminheap([(1,'a'), (2,'b')]).push(3,'c')
+		pminheap([(1, 'a'), (2, 'b'), (3, 'c')])
+		>>> pmaxheap([(1,'a'), (2,'b')]).push(3,'c')
+		pmaxheap([(3, 'c'), (2, 'b'), (1, 'a')])
+		'''
 		if self._size == 0:
 			return type(self)(1, key, value, None)
 		if (key < self._key) != self._down:
@@ -231,7 +283,23 @@ class Heap(Generic[K,V], Collection[K], Hashable):
 		return type(self)(self._size + 1, k1, v1,
 			Forest.push(self._forest, self._down, 0, Tree(k2, v2, None, None)))
 
-	def pop(self) -> Tuple[K,V,Heap[K,V]]:
+	def pop(self) -> Tuple[K,V,PHeap[K,V]]:
+		r'''
+		Remove and return the min/max item
+
+		:math:`O(\log{n})`
+
+		:raises IndexError: if the heap is empty
+
+		>>> pminheap([(1,'a'), (2,'b'), (3,'c')]).pop()
+		(1, 'a', pminheap([(2, 'b'), (3, 'c')]))
+		>>> pmaxheap([(1,'a'), (2,'b'), (3,'c')]).pop()
+		(3, 'c', pmaxheap([(2, 'b'), (1, 'a')]))
+		>>> pminheap([]).pop()
+		Traceback (most recent call last):
+		...
+		IndexError: ...
+		'''
 		if self._size == 0:
 			raise IndexError('pop from empty heap')
 		if self._forest is None:
@@ -239,7 +307,18 @@ class Heap(Generic[K,V], Collection[K], Hashable):
 		key, value, forest = self._forest.pop(self._down)
 		return self._key, self._value, type(self)(self._size - 1, key, value, forest)
 
-	def merge(self, other:HeapLike[K,V]) -> Heap[K,V]:
+	def merge(self, other:PHeapLike[K,V]) -> PHeap[K,V]:
+		r'''
+		Return the union of the two heaps
+
+		amortized :math:`O(\log(\min(n,m)))`,
+		worst-case :math:`O(\log(\max(n,m)))`
+
+		>>> pminheap([(1,'a'), (3,'c')]) + pminheap([(2,'b'), (4,'d')])
+		pminheap([(1, 'a'), (2, 'b'), (3, 'c'), (4, 'd')])
+		>>> pmaxheap([(1,'a'), (3,'c')]) + pmaxheap([(2,'b'), (4,'d')])
+		pmaxheap([(4, 'd'), (3, 'c'), (2, 'b'), (1, 'a')])
+		'''
 		other = self._fromitems(other)
 		if self._size == 0: return other
 		if other._size == 0: return self
@@ -253,37 +332,126 @@ class Heap(Generic[K,V], Collection[K], Hashable):
 	__add__ = merge
 
 	def peek(self) -> Tuple[K,V]:
+		r'''
+		Find the min/max element
+
+		:math:`O(1)`
+
+		:raises IndexError: if the heap is empty
+
+		>>> pminheap([(1,'a'), (2,'b'), (3,'c')]).peek()
+		(1, 'a')
+		>>> pmaxheap([(1,'a'), (2,'b'), (3,'c')]).peek()
+		(3, 'c')
+		>>> pminheap().peek()
+		Traceback (most recent call last):
+		...
+		IndexError: ...
+		'''
 		if self._size == 0:
 			raise IndexError('min of empty heap')
 		return self._key, self._value
 
 	def __len__(self) -> int:
+		r'''
+		Get the size of the heap
+
+		:math:`O(1)`
+
+		>>> len(pminheap([(1,'a'), (2,'b'), (3,'c')]))
+		3
+		'''
 		return self._size
 
 	def __bool__(self) -> bool:
 		return self._size != 0
 
 	def __contains__(self, key) -> bool:
-		return key in HeapKeys(self, False)
+		return key in PHeapKeys(self, False)
 
 	def __repr__(self) -> str:
 		return '{}({})'.format(self._name, list(self.items()))
 
-	def items(self, sorted:bool=True) -> HeapItems[K,V]:
-		return HeapItems(self, sorted)
+	def items(self, sorted:bool=True) -> PHeapItems[K,V]:
+		r'''
+		Create a view of the heap's items
 
-	def keys(self, sorted:bool=True) -> HeapKeys[K,V]:
-		return HeapKeys(self, sorted)
+		:math:`O(1)`
 
-	def values(self, sorted:bool=True) -> HeapValues[V,K]:
-		return HeapValues(self, sorted)
+		Iterating over the entire heap is :math:`O(n\log{n})` for
+		``sorted=True`` and :math:`O(n)` for ``sorted=False``.
+
+		Similar to :meth:`python:dict.items`.
+
+		See :class:`PHeapView`.
+
+		>>> list(pminheap([(1,'a'), (2,'b'), (3,'c')]).items())
+		[(1, 'a'), (2, 'b'), (3, 'c')]
+		>>> list(pmaxheap([(1,'a'), (2,'b'), (3,'c')]).items())
+		[(3, 'c'), (2, 'b'), (1, 'a')]
+		'''
+		return PHeapItems(self, sorted)
+
+	def keys(self, sorted:bool=True) -> PHeapKeys[K,V]:
+		r'''
+		Create a view of the heap's keys
+
+		:math:`O(1)`
+
+		Iterating over the entire heap is :math:`O(n\log{n})` for
+		``sorted=True`` and :math:`O(n)` for ``sorted=False``.
+
+		Similar to :meth:`python:dict.keys`.
+
+		See :class:`PHeapView`.
+
+		>>> list(pminheap([(1,'a'), (2,'b'), (3,'c')]).keys())
+		[1, 2, 3]
+		>>> list(pmaxheap([(1,'a'), (2,'b'), (3,'c')]).keys())
+		[3, 2, 1]
+		'''
+		return PHeapKeys(self, sorted)
+
+	def values(self, sorted:bool=True) -> PHeapValues[K,V]:
+		r'''
+		Create a view of the heap's values
+
+		:math:`O(1)`
+
+		Iterating over the entire heap is :math:`O(n\log{n})` for
+		``sorted=True`` and :math:`O(n)` for ``sorted=False``.
+
+		Similar to :meth:`python:dict.values`.
+
+		See :class:`PHeapView`.
+
+		>>> list(pminheap([(1,'a'), (2,'b'), (3,'c')]).values())
+		['a', 'b', 'c']
+		>>> list(pmaxheap([(1,'a'), (2,'b'), (3,'c')]).values())
+		['c', 'b', 'a']
+		'''
+		return PHeapValues(self, sorted)
 
 	def __iter__(self) -> Iterator[K]:
-		return iter(HeapKeys(self, True))
+		r'''
+		Iterate through the heap's keys
+
+		:math:`O(1)`
+
+		Iterating over the entire heap is :math:`O(n\log{n})`
+
+		See :meth:`keys`.
+
+		>>> list(pminheap([(1,'a'), (2,'b'), (3,'c')]).keys())
+		[1, 2, 3]
+		>>> list(pmaxheap([(1,'a'), (2,'b'), (3,'c')]).keys())
+		[3, 2, 1]
+		'''
+		return iter(PHeapKeys(self, True))
 
 	@classmethod
-	def _fromitems(cls, items:HeapLike[K,V]) -> Heap[K,V]:
-		if isinstance(items, Heap):
+	def _fromitems(cls, items:PHeapLike[K,V]) -> PHeap[K,V]:
+		if isinstance(items, PHeap):
 			if items._down == cls._down: return items
 			return cls._fromitems(items.items(sorted=False))
 		size, forest = 0, None
@@ -303,8 +471,8 @@ class Heap(Generic[K,V], Collection[K], Hashable):
 	def _iter_group_values(self) -> Iterator[Tuple[K,Iterator[Tuple[K,V]]]]:
 		return itertools.groupby(self.items(), key=operator.itemgetter(0))
 
-	def _compare(self, other:Heap[K,V], equality:bool) -> int:
-		if not isinstance(other, Heap):
+	def _compare(self, other:PHeap[K,V], equality:bool) -> int:
+		if not isinstance(other, PHeap):
 			return NotImplemented
 		if self._down != other._down:
 			return NotImplemented
@@ -335,79 +503,247 @@ class Heap(Generic[K,V], Collection[K], Hashable):
 			assert not yvalues
 
 	def __eq__(self, other) -> bool:
+		r'''
+		Return self == other
+
+		:math:`O(n\log{n})` if values are comparable
+
+		:math:`O(n\log{n}+g^2)` if values are not comparable,
+		where `g` is the number of values with the same key
+
+		>>> xs = pminheap([(1,'a'), (2,'b'), (3,'c')])
+		>>> xs == pminheap([(1,'a'), (2,'b'), (3,'c')])
+		True
+		>>> xs == pminheap([(2,'b'), (3,'c'), (4,'d')])
+		False
+		'''
 		result = self._compare(other, True)
 		if result is NotImplemented: return NotImplemented
 		return result == 0
+
 	def __ne__(self, other) -> bool:
+		r'''
+		Return self != other
+
+		:math:`O(n\log{n})` if values are comparable
+
+		:math:`O(n\log{n}+g^2)` if values are not comparable,
+		where `g` is the number of values with the same key
+
+		>>> xs = pminheap([(1,'a'), (2,'b'), (3,'c')])
+		>>> xs != pminheap([(1,'a'), (2,'b'), (3,'c')])
+		False
+		>>> xs != pminheap([(2,'b'), (3,'c'), (4,'d')])
+		True
+		'''
 		result = self._compare(other, True)
 		if result is NotImplemented: return NotImplemented
 		return result != 0
+
 	def __gt__(self, other) -> bool:
+		r'''
+		Return self > other
+
+		:math:`O(n\log{n})`
+
+		:raises TypeError: if values are not comparable
+
+		>>> xs = pminheap([(1,'a'), (2,'b'), (3,'c')])
+		>>> xs > pminheap([(1,'a'), (2,'b'), (3,'c')])
+		False
+		>>> xs > pminheap([(2,'b'), (3,'c'), (4,'d')])
+		False
+		>>> xs > pminheap([(0,'z'), (1,'a'), (2,'b')])
+		True
+		'''
 		result = self._compare(other, False)
 		if result is NotImplemented: return NotImplemented
 		return result > 0
+
 	def __ge__(self, other) -> bool:
+		r'''
+		Return self >= other
+
+		:math:`O(n\log{n})`
+
+		:raises TypeError: if values are not comparable
+
+		>>> xs = pminheap([(1,'a'), (2,'b'), (3,'c')])
+		>>> xs >= pminheap([(1,'a'), (2,'b'), (3,'c')])
+		True
+		>>> xs >= pminheap([(2,'b'), (3,'c'), (4,'d')])
+		False
+		>>> xs >= pminheap([(0,'z'), (1,'a'), (2,'b')])
+		True
+		'''
 		result = self._compare(other, False)
 		if result is NotImplemented: return NotImplemented
 		return result >= 0
+
 	def __lt__(self, other) -> bool:
+		r'''
+		Return self < other
+
+		:math:`O(n\log{n})`
+
+		:raises TypeError: if values are not comparable
+
+		>>> xs = pminheap([(1,'a'), (2,'b'), (3,'c')])
+		>>> xs < pminheap([(1,'a'), (2,'b'), (3,'c')])
+		False
+		>>> xs < pminheap([(2,'b'), (3,'c'), (4,'d')])
+		True
+		>>> xs < pminheap([(0,'z'), (1,'a'), (2,'b')])
+		False
+		'''
 		result = self._compare(other, False)
 		if result is NotImplemented: return NotImplemented
 		return result < 0
+
 	def __le__(self, other) -> bool:
+		r'''
+		Return self <= other
+
+		:math:`O(n\log{n})`
+
+		:raises TypeError: if values are not comparable
+
+		>>> xs = pminheap([(1,'a'), (2,'b'), (3,'c')])
+		>>> xs <= pminheap([(1,'a'), (2,'b'), (3,'c')])
+		True
+		>>> xs <= pminheap([(2,'b'), (3,'c'), (4,'d')])
+		True
+		>>> xs <= pminheap([(0,'z'), (1,'a'), (2,'b')])
+		False
+		'''
 		result = self._compare(other, False)
 		if result is NotImplemented: return NotImplemented
 		return result <= 0
 
 	def __hash__(self) -> int:
+		r'''
+		Calculate the hash of the heap.
+
+		:math:`O(n)`
+
+		:raises TypeError: if values are not comparable
+
+		>>> x1 = pminheap([(1,'a'), (2,'b'), (3,'c')])
+		>>> x2 = pminheap([(1,'a'), (2,'b'), (3,'c')])
+		>>> hash(x1) == hash(x2)
+		True
+		'''
 		h = hash(self._name)
 		for k, vs in itertools.groupby(self.items(), key=operator.itemgetter(0)):
 			h = hash((h, k, tuple(sorted(vs))))
 		return h
 
 	def __reduce__(self):
+		r'''
+		Support method for :mod:`python:pickle`
+
+		:math:`O(n)`
+
+		>>> import pickle
+		>>> pickle.loads(pickle.dumps(pminheap([(1,'a'), (2,'b'), (3,'c')])))
+		pminheap([(1, 'a'), (2, 'b'), (3, 'c')])
+		'''
 		return globals()[self._name], (tuple(self.items(False)),)
 
-HeapLike = Union[Heap[K,V],Iterable[Tuple[K,V]]]
+PHeapLike = Union[PHeap[K,V],Iterable[Tuple[K,V]]]
 
-class PMinHeap(Heap[K,V]):
-	__doc__ = Heap.__doc__
+class PMinHeap(PHeap[K,V]):
+	__doc__ = PHeap.__doc__
 	_name: ClassVar[str] = 'pminheap'
 	_down: ClassVar[bool] = False
 	_empty: ClassVar[PMinHeap[Any,Any]] = cast(Any, None)
 PMinHeap._empty = PMinHeap(0, None, None, None) # type: ignore
 
-def pminheap(items:HeapLike[K,V]=PMinHeap._empty) -> PMinHeap[K,V]:
+def pminheap(items:PHeapLike[K,V]=PMinHeap._empty) -> PMinHeap[K,V]:
+	r'''
+	Create a :class:`PMinHeap` from the given items
+
+	:math:`O(n)`
+
+	>>> pminheap()
+	pminheap([])
+	>>> pminheap([(1,'a'), (2,'b'), (3,'c')])
+	pminheap([(1, 'a'), (2, 'b'), (3, 'c')])
+	'''
 	return cast(PMinHeap, PMinHeap._fromitems(items))
 
-def pminheap_fromkeys(items:Iterable[K]) -> PMinHeap[K,None]:
-	return pminheap((item, None) for item in items)
+def pminheap_fromkeys(items:Iterable[K], value:V=None) -> PMinHeap[K,V]:
+	r'''
+	Create a :class:`PMinHeap` using a default value
+
+	:math:`O(n)`
+
+	>>> pminheap.fromkeys([1, 2, 3])
+	pminheap([(1, None), (2, None), (3, None)])
+	>>> pminheap.fromkeys([1, 2, 3], value='a')
+	pminheap([(1, 'a'), (2, 'a'), (3, 'a')])
+	'''
+	val: V = cast(V, value)
+	return pminheap((item, val) for item in items)
 setattr(pminheap, 'fromkeys', pminheap_fromkeys)
 
 def hl(*items:Tuple[K,V]) -> PMinHeap[K,V]:
+	'''
+	Shorthand for :func:`pminheap`
+
+	Mnemonic: Heap Less-than
+
+	>>> hl((1,'a'), (2,'b'), (3,'c'))
+	pminheap([(1, 'a'), (2, 'b'), (3, 'c')])
+	'''
 	return pminheap(items)
 
-class PMaxHeap(Heap[K,V]):
-	__doc__ = Heap.__doc__
+class PMaxHeap(PHeap[K,V]):
+	__doc__ = PHeap.__doc__
 	_name: ClassVar[str] = 'pmaxheap'
 	_down: ClassVar[bool] = True
 	_empty: ClassVar[PMaxHeap[Any,Any]] = cast(Any, None)
 PMaxHeap._empty = PMaxHeap(0, None, None, None) # type: ignore
 
-def pmaxheap(items:HeapLike[K,V]=PMaxHeap._empty) -> PMaxHeap[K,V]:
+def pmaxheap(items:PHeapLike[K,V]=PMaxHeap._empty) -> PMaxHeap[K,V]:
+	r'''
+	Create a :class:`PMaxHeap` from the given items
+
+	:math:`O(n)`
+
+	>>> pmaxheap()
+	pmaxheap([])
+	>>> pmaxheap([(1,'a'), (2,'b'), (3,'c')])
+	pmaxheap([(3, 'c'), (2, 'b'), (1, 'a')])
+	'''
 	return cast(PMaxHeap, PMaxHeap._fromitems(items))
 
-def pmaxheap_fromkeys(items:Iterable[K]) -> PMaxHeap[K,None]:
-	return pmaxheap((item, None) for item in items)
+def pmaxheap_fromkeys(items:Iterable[K], value:V=None) -> PMaxHeap[K,V]:
+	r'''
+	Create a :class:`PMaxHeap` using a default value
+
+	:math:`O(n)`
+
+	>>> pmaxheap.fromkeys([1, 2, 3])
+	pmaxheap([(3, None), (2, None), (1, None)])
+	>>> pmaxheap.fromkeys([1, 2, 3], value='a')
+	pmaxheap([(3, 'a'), (2, 'a'), (1, 'a')])
+	'''
+	val: V = cast(V, value)
+	return pmaxheap((item, val) for item in items)
 setattr(pmaxheap, 'fromkeys', pmaxheap_fromkeys)
 
 def hg(*items:Tuple[K,V]) -> PMaxHeap[K,V]:
 	'''
-	Shorthand to create a PMaxHeap
+	Shorthand for :func:`pmaxheap`
+
+	Mnemonic: Heap Greater-than
 
 	>>> hg((1,'a'), (2,'b'), (3,'c'))
 	pmaxheap([(3, 'c'), (2, 'b'), (1, 'a')])
 	'''
 	return pmaxheap(items)
 
-__all__ = ('hl', 'pminheap', 'PMinHeap', 'hg', 'pmaxheap', 'PMaxHeap')
+__all__: Tuple[str, ...] = \
+	('hl', 'pminheap', 'PMinHeap', 'hg', 'pmaxheap', 'PMaxHeap')
+if sphinx_build: __all__ += ('PHeapView',)

@@ -2390,6 +2390,9 @@ static int PSequence_contains(PSequence* self, PyObject* arg) {
 
 // {{{ indexItem
 
+static PSequence* PSequence_takeLeft(PSequence* self, Py_ssize_t index);
+static PSequence* PSequence_takeRight(PSequence* self, Py_ssize_t index);
+
 #define check_and_return(index, offset) do { \
 	Py_ssize_t _idx = index; \
 	if(_idx < 0) return _idx; \
@@ -2437,12 +2440,18 @@ static Py_ssize_t FTree_indexItem(FTree* tree, PyObject* arg) {
 
 #undef check_and_return
 
-static PyObject* PSequence_indexItem(PSequence* self, PyObject* arg) {
-	Py_ssize_t index = FTree_indexItem(self->tree, arg);
+static PyObject* PSequence_indexItem(PSequence* self, PyObject* args) {
+	PyObject* value; Py_ssize_t start = 0, stop = FTree_ssize(self->tree);
+	if(!PyArg_ParseTuple(args, "O|nn", &value, &start, &stop)) return NULL;
+	PSequence* seq1 = PSequence_takeRight(self, FTree_ssize(self->tree) - start);
+	PSequence* seq2 = PSequence_takeLeft(self, stop - start);
+	Py_DECREF(seq1);
+	Py_ssize_t index = FTree_indexItem(seq2->tree, value);
+	Py_DECREF(seq2);
 	if(index < 0) return NULL;
 	if(index == 0)
 		return PyErr_Format(PyExc_ValueError, "value not in sequence");
-	return PyLong_FromSsize_t(index - 1);
+	return PyLong_FromSsize_t(index - 1 + (start >= 0 ? start : 0));
 }
 
 // }}}
@@ -3461,6 +3470,13 @@ static PyObject* PSequence_refcount(PyObject* self, PyObject* args) {
 		FRefs_get(FTreeR), FRefs_get(FDigitR), FRefs_get(FNodeR));
 }
 
+static PSequence* PSequence_fromItems(PyObject* self, PyObject* args) {
+	PyObject* arg = NULL;
+	if(!PyArg_ParseTuple(args, "|O", &arg)) return NULL;
+	if(arg == NULL) return PObj_IncRef(EMPTY_SEQUENCE);
+	return PSequence_fromIterable(arg);
+}
+
 static PSequenceIter* PSequence_iter(PSequence* self);
 static PSequenceIter* PSequence_reversed(PSequence* self);
 static PSequenceEvolver* PSequence_evolver(PSequence* self);
@@ -3513,7 +3529,7 @@ static PyMethodDef PSequence_methods[] = {
 	define_method(delete,       deleteSubscr, O),
 	define_method(remove,       removeItemN,  O),
 	define_method(transform,    transform,    VARARGS),
-	define_method(index,        indexItem,    O),
+	define_method(index,        indexItem,    VARARGS),
 	define_method(count,        countItem,    O),
 	define_method(chunksof,     chunksOfN,    O),
 	define_method(__reduce__,   reduce,       NOARGS),
@@ -3524,6 +3540,7 @@ static PyMethodDef PSequence_methods[] = {
 	define_method(sort,         sort,         VARARGS | METH_KEYWORDS),
 	define_method(_fromtree,    fromTuple,    O       | METH_STATIC),
 	define_method(_refcount,    refcount,     NOARGS  | METH_STATIC),
+	define_method(_fromitems,   fromItems,    VARARGS | METH_STATIC),
 	{NULL}
 };
 #undef define_method
@@ -4092,7 +4109,7 @@ static PyMethodDef PSequenceEvolver_methods[] = {
 	define_method(delete,       deleteSubscr, O),
 	define_method(remove,       removeItemN,  O),
 	define_method(transform,    transform,    VARARGS),
-	define_method(index,        indexItem,    O),
+	define_method(index,        indexItem,    VARARGS),
 	define_method(count,        countItem,    O),
 	define_method(chunksof,     chunksOfN,    O),
 	define_method(__reduce__,   reduce,       NOARGS),
@@ -4180,31 +4197,16 @@ static PyTypeObject PSequenceEvolverType = {
 
 // {{{ module def
 
-static PSequence* pyrsistent_psequence(PyObject* self, PyObject* args) {
-	PyObject* arg = NULL;
-	if(!PyArg_ParseTuple(args, "|O", &arg)) return NULL;
-	if(arg == NULL) return PObj_IncRef(EMPTY_SEQUENCE);
-	return PSequence_fromIterable(arg);
-}
-
-#define define_method(name, method, flags) \
-	{ #name, (PyCFunction)pyrsistent_##method, METH_##flags, NULL }
-static PyMethodDef methodDef[] = {
-	define_method(psequence, psequence, VARARGS),
-	{NULL}
-};
-#undef define_method
-
 static struct PyModuleDef moduleDef = {
 	PyModuleDef_HEAD_INIT,
 	.m_name     = (const char*)"pyrsistent_extras._psequence._c_ext",
 	.m_doc      = (const char*)"persistent sequence c implementation",
 	.m_size     = (Py_ssize_t)-1,
-	.m_methods  = (PyMethodDef*)methodDef,
-	.m_slots    = (struct PyModuleDef_Slot*)NULL,
-	.m_traverse = (traverseproc)NULL,
-	.m_clear    = (inquiry)NULL,
-	.m_free     = (freefunc)NULL,
+	// .m_methods  = (PyMethodDef*)NULL,
+	// .m_slots    = (struct PyModuleDef_Slot*)NULL,
+	// .m_traverse = (traverseproc)NULL,
+	// .m_clear    = (inquiry)NULL,
+	// .m_free     = (freefunc)NULL,
 };
 
 void* PObj_getDoc(const char* name, PyObject* base) {
@@ -4294,9 +4296,12 @@ PyMODINIT_FUNC PyInit__c_ext() {
 
 	PyObject* module = PyModule_Create(&moduleDef);
 	if(module == NULL) return NULL;
-	PyModule_AddObject(module, "PSequence", PObj_IncRef(&PSequenceType));
-	PyModule_AddObject(module, "Evolver", PObj_IncRef(&PSequenceEvolverType));
-	PSEQUENCE_FUNCTION = PyObject_GetAttrString(module, "psequence");
+	PyModule_AddObject(module, "PSequence",
+		PObj_IncRef(&PSequenceType));
+	PyModule_AddObject(module, "Evolver",
+		PObj_IncRef(&PSequenceEvolverType));
+	PSEQUENCE_FUNCTION = PyObject_GetAttrString(
+		(PyObject*)(&PSequenceType), "_fromitems");
 	assert(PSEQUENCE_FUNCTION != NULL);
 	return module;
 }

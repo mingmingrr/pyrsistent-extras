@@ -1,7 +1,3 @@
-import sys
-import os
-sys.path.insert(0, os.path.abspath('../..'))
-
 project          = 'pyrsistent-extras'
 copyright        = '2022, mingmingrr'
 author           = 'mingmingrr'
@@ -10,7 +6,7 @@ exclude_patterns = []
 
 extensions = [
 	'sphinx.ext.autodoc',
-	'sphinx.ext.autosummary',
+	#  'sphinx.ext.autosummary',
 	'sphinx.ext.mathjax',
 	'sphinx.ext.intersphinx',
 	'sphinx.ext.viewcode',
@@ -27,3 +23,11 @@ intersphinx_mapping = {
 import sphinx_rtd_theme
 html_theme      = 'sphinx_rtd_theme'
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+
+import builtins
+builtins.__sphinx_build__ = True
+
+import sys
+import os
+sys.path.insert(0, os.path.abspath('../..'))
+

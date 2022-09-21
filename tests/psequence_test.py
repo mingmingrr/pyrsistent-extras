@@ -1,4 +1,4 @@
-from pyrsistent_extras._psequence import psequence, PSequence, sq
+from pyrsistent_extras import psequence, PSequence, sq
 
 import hypothesis
 from hypothesis import given, strategies as st

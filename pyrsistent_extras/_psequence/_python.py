@@ -3,12 +3,12 @@ from typing import Sequence, MutableSequence, Hashable, \
 	Any, Iterator, Iterable, TypeVar, Union, \
 	List, Tuple, Optional, overload, cast
 
-from enum import Enum
-from functools import wraps
-from itertools import groupby
+import enum
+import itertools
+import builtins
 
 from ._base import PSequenceBase, PSequenceEvolverBase
-from .._util import compare_iter
+from .._util import compare_iter, check_index, sphinx_build
 
 T = TypeVar('T')
 
@@ -28,14 +28,15 @@ class PSequence(PSequenceBase[T]):
 
 	__slots__ = ('_type', '_size', '_items')
 
-	class _Type(Enum):
+	if not sphinx_build:
+		_type: PSequence._Type
+		_size: int
+		_items: Tuple[PSequence[T], ...]
+
+	class _Type(enum.Enum):
 		Node = 0
 		Digit = 1
 		Tree = 2
-
-	_type: PSequence._Type
-	_size: int
-	_items: Tuple[PSequence[T], ...]
 
 	def __new__(cls, _type, _size, _items):
 		self = super(PSequence, cls).__new__(cls)
@@ -241,7 +242,7 @@ class PSequence(PSequenceBase[T]):
 		return left1, item, right1
 
 	def splitat(self, index:int) -> Tuple[PSequence[T], PSequence[T]]:
-		try: index = self._checkindex(index)
+		try: index = check_index(self._size, index)
 		except IndexError:
 			if index < 0: return EMPTY_SEQUENCE, self
 			return self, EMPTY_SEQUENCE
@@ -346,15 +347,15 @@ class PSequence(PSequenceBase[T]):
 			left1, middle1._extend(middle2), right2)
 
 	def extendright(self, other:Union[PSequence[T], Iterable[T]]) -> PSequence[T]:
-		return self._extend(psequence(other))
+		return self._extend(PSequence._fromitems(other))
 
 	extend = extendright
-	__add__ = extendright
+	__add__ = extendright #: :meta public:
 
 	def extendleft(self, other:Union[PSequence[T], Iterable[T]]) -> PSequence[T]:
-		return psequence(other)._extend(self)
+		return PSequence._fromitems(other)._extend(self)
 
-	__radd__ = extendleft
+	__radd__ = extendleft #: :meta public:
 
 	def reverse(self) -> PSequence[T]:
 		if self._isnode1(): return self
@@ -411,9 +412,9 @@ class PSequence(PSequenceBase[T]):
 			else:
 				output = []
 				modulo, count = self._getslice(start, count, abs(step) - 1, output)
-				tree = psequence(output)
+				tree = PSequence._fromitems(output)
 			return tree if step > 0 else tree.reverse()
-		index = self._checkindex(index)
+		index = check_index(self._size, index)
 		return self._getitem(index)
 
 	def _setitem(self, index, value):
@@ -444,7 +445,7 @@ class PSequence(PSequenceBase[T]):
 		if isinstance(index, slice):
 			start, stop, step, count = self._sliceindices(index, self._size)
 			if step == 1:
-				mid = psequence(value)
+				mid = PSequence._fromitems(value)
 				return self._takeL(start) + mid + \
 					self._takeR(self._size - max(start, stop))
 			if count == 0: return self
@@ -458,7 +459,7 @@ class PSequence(PSequenceBase[T]):
 				 + '{} to extended slice of size {}'.format(self._size, count))
 			return self._setslice(start, count, abs(step) - 1,
 				iter(value) if step > 0 else reversed(value))[0]
-		index = self._checkindex(index)
+		index = check_index(self._size, index)
 		return self._setitem(index, value)
 
 	def _mset(self, index, pairs):
@@ -483,10 +484,10 @@ class PSequence(PSequenceBase[T]):
 				index, value = arg, next(args)
 			else:
 				raise TypeError('expected int or tuple but got {}'.format(type(arg)))
-			pairs.append((self._checkindex(index), value))
+			pairs.append((check_index(self._size, index), value))
 		key = lambda x: x[0]
 		pairs = [(index, list(group)[-1][1]) for index, group in
-			groupby(sorted(pairs, key=key, reverse=True), key=key)]
+			itertools.groupby(sorted(pairs, key=key, reverse=True), key=key)]
 		return self._mset(0, pairs)[1]
 
 	def _mergeleftnode(self, item):
@@ -569,7 +570,7 @@ class PSequence(PSequenceBase[T]):
 			if abs(step) == 1: return self._takeL(start) + \
 				self._takeR(self._size - max(start, stop))
 			return self._deleteslice(start, stop, step, count)
-		index = self._checkindex(index)
+		index = check_index(self._size, index)
 		full, meld = self._deleteitem(index)
 		if not full: return EMPTY_SEQUENCE
 		return meld
@@ -603,7 +604,7 @@ class PSequence(PSequenceBase[T]):
 			PSequence._digitS(*meld[3:])), None
 
 	def insert(self, index:int, value:T) -> PSequence[T]:
-		try: index = self._checkindex(index)
+		try: index = check_index(self._size, index)
 		except IndexError:
 			if index < 0: return self.appendleft(value)
 			return self.appendright(value)
@@ -634,14 +635,16 @@ class PSequence(PSequenceBase[T]):
 		while self._size != 0:
 			chunk, self = self.splitat(size)
 			acc.append(chunk)
-		return psequence(acc)
+		return PSequence._fromitems(acc)
 
 	def __reduce__(self):
-		return psequence, (self.tolist(),)
+		return PSequence._fromitems, (self.tolist(),)
 
 	def __hash__(self) -> int:
 		r'''
-		:math:`O(n)`. Calculate the hash of the sequence.
+		Calculate the hash of the sequence.
+
+		:math:`O(n)`
 
 		>>> x1 = psequence([1,2,3,4])
 		>>> x2 = psequence([1,2,3,4])
@@ -712,7 +715,7 @@ class PSequence(PSequenceBase[T]):
 	def sort(self, *args, **kwargs) -> PSequence[T]:
 		xs = self.tolist()
 		xs.sort(*args, **kwargs)
-		return psequence(xs)
+		return PSequence._fromitems(xs)
 
 	def _totree(self):
 		if self._isnode1(): return 'Node', 1, self._items[0]
@@ -749,8 +752,21 @@ class PSequence(PSequenceBase[T]):
 		for item in reversed(self._items):
 			yield from reversed(item)
 
+	@staticmethod
+	def _fromitems(iterable:Optional[Iterable[T]]=None) -> PSequence[T]:
+		if iterable is None: return EMPTY_SEQUENCE
+		if isinstance(iterable, Evolver): return iterable._seq
+		if isinstance(iterable, PSequence): return iterable
+		nodes = [PSequence._node1(i) for i in iterable]
+		return PSequence._fromnodes(len(nodes), nodes)
+
 class Evolver(PSequenceEvolverBase[T]):
+	__doc__ = PSequenceEvolverBase.__doc__
+
 	__slots__ = ('_seq',)
+
+	if not sphinx_build:
+		_seq: PSequence[T]
 
 	def __init__(self, _seq):
 		self._seq = _seq
@@ -914,10 +930,9 @@ class Evolver(PSequenceEvolverBase[T]):
 
 EMPTY_SEQUENCE: PSequence[Any] = PSequence(PSequence._Type.Tree, 0, tuple())
 
-def psequence(iterable=EMPTY_SEQUENCE):
-	if isinstance(iterable, Evolver): return iterable._seq
-	if isinstance(iterable, PSequence): return iterable
-	nodes = [PSequence._node1(i) for i in iterable]
-	return PSequence._fromnodes(len(nodes), nodes)
+# for doctest
+def psequence(*args, **kwargs):
+	from pyrsistent_extras import psequence as pseq
+	return pseq(*args, **kwargs)
 
-__all__ = ('psequence', 'PSequence')
+__all__ = ('PSequence', 'Evolver')

@@ -5,7 +5,10 @@ Welcome to pyrsistent-extras's documentation!
    :maxdepth: 4
    :caption: Contents:
 
-   api/modules
+   api/psequence
+   api/pminheap
+   api/pmaxheap
+   api/heapviews
 
 Indices and tables
 ==================
