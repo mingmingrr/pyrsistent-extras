@@ -1,5 +1,4 @@
+pyrsistent
 pytest
 pytest-xdist
 hypothesis
-coverage
-coveralls
