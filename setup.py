@@ -49,8 +49,12 @@ WARNING: Could not build the %s.
             sys.stderr.write('%s\n' % str(e))
             sys.stderr.write(self.warning_message % ('%s extension module' % name, 'The output above this warning shows how the compilation failed.'))
 
+with open('pyrsistent_extras/_version.py') as version_file:
+    exec(version_file.read())
+
 setuptools.setup(
     name='pyrsistent-extras',
+    version=__version__,
     description='Extra data structures for pyrsistent',
     long_description=readme,
     long_description_content_type='text/x-rst',

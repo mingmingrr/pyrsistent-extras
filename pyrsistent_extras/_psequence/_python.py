@@ -635,7 +635,7 @@ class PSequence(PSequenceBase[T]):
 		while self._size != 0:
 			chunk, self = self.splitat(size)
 			acc.append(chunk)
-		return PSequence._fromitems(acc)
+		return PSequence._fromitems(cast(List[Sequence[T]], acc))
 
 	def __reduce__(self):
 		return PSequence._fromitems, (self.tolist(),)

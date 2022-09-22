@@ -7,6 +7,8 @@ Pyrsistent-Extras
 	:target: https://coveralls.io/github/mingmingrr/pyrsistent-extras?branch=main
 .. image:: https://github.com/mingmingrr/pyrsistent-extras/actions/workflows/tests.yaml/badge.svg
 	:target: https://github.com/mingmingrr/pyrsistent-extras/actions/workflows/tests.yaml
+.. image:: https://github.com/mingmingrr/pyrsistent-extras/actions/workflows/mypy.yaml/badge.svg
+	:target: https://github.com/mingmingrr/pyrsistent-extras/actions/workflows/mypy.yaml
 
 Extra data structures for `pyrsistent <http://github.com/tobgu/pyrsistent>`_
 
