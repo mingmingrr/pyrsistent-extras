@@ -21,6 +21,14 @@ if platform.python_implementation() == 'CPython' and os.getenv('PYRSISTENT_SKIP_
 needs_pytest = {'pytest', 'test', 'ptr'}.intersection(sys.argv)
 pytest_runner = ['pytest-runner'] if needs_pytest else []
 
+requires_path = os.path.join(os.path.dirname(__file__), 'requirements.txt')
+with codecs.open(requires_path, encoding='utf8') as f:
+    install_requires = f.read()
+
+requires_path = os.path.join(os.path.dirname(__file__), 'requirements_dev.txt')
+with codecs.open(requires_path, encoding='utf8') as f:
+    tests_require = f.read()
+
 class custom_build_ext(build_ext):
     '''Allow C extension building to fail.'''
 
@@ -74,8 +82,9 @@ setuptools.setup(
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: Implementation :: PyPy',
     ],
+    install_requires=install_requires,
     test_suite='tests',
-    tests_require=['pytest<7', 'hypothesis<7'],
+    tests_require=tests_require,
     scripts=[],
     setup_requires=pytest_runner,
     ext_modules=extensions,
