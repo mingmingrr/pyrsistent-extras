@@ -1253,7 +1253,7 @@ static PyObject* FTree_peekLeft(FTree* tree) {
 	}
 }
 
-static PyObject* PSequence_peekLeft(PSequence* self, void*) {
+static PyObject* PSequence_peekLeft(PSequence* self, void* UNUSED _ignore) {
 	return FTree_peekLeft(self->tree);
 }
 
@@ -1273,7 +1273,7 @@ static PyObject* FTree_peekRight(FTree* tree) {
 	}
 }
 
-static PyObject* PSequence_peekRight(PSequence* self, void*) {
+static PyObject* PSequence_peekRight(PSequence* self, void* UNUSED _ignore) {
 	return FTree_peekRight(self->tree);
 }
 
