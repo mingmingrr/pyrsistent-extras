@@ -1,14 +1,14 @@
 Welcome to pyrsistent-extras's documentation!
 =============================================
 
+.. include:: ../../README.rst
+
 .. toctree::
    :maxdepth: 4
    :caption: Contents:
 
    api/psequence
-   api/pminheap
-   api/pmaxheap
-   api/heapviews
+   api/pheap
 
 Indices and tables
 ==================

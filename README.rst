@@ -1,6 +1,10 @@
 Pyrsistent-Extras
 =================
 
+.. image:: https://readthedocs.org/projects/pyrsistent-extras/badge/?version=latest
+	:target: https://pyrsistent-extras.readthedocs.io/en/latest/?badge=latest
+.. image:: https://coveralls.io/repos/github/mingmingrr/pyrsistent-extras/badge.svg?branch=main
+	:target: https://coveralls.io/github/mingmingrr/pyrsistent-extras?branch=main
 .. image:: https://github.com/mingmingrr/pyrsistent-extras/actions/workflows/tests.yaml/badge.svg
 	:target: https://github.com/mingmingrr/pyrsistent-extras/actions/workflows/tests.yaml
 
@@ -24,14 +28,16 @@ and :math:`O(1)` access at both ends.
 
 	>>> from pyrsistent_extras import psequence
 	>>> seq1 = psequence([1, 2, 3])
-	>>> seq2 = seq1.append(4)
-	>>> seq3 = seq1 + seq2
 	>>> seq1
 	psequence([1, 2, 3])
+	>>> seq2 = seq1.append(4)
 	>>> seq2
 	psequence([1, 2, 3, 4])
+	>>> seq3 = seq1 + seq2
 	>>> seq3
 	psequence([1, 2, 3, 1, 2, 3, 4])
+	>>> seq1
+	psequence([1, 2, 3])
 	>>> seq3[3]
 	1
 	>>> seq3[2:5]

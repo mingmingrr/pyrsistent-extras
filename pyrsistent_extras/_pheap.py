@@ -122,7 +122,7 @@ class PHeapView(Generic[K,V,T], Collection[T]):
 		r'''
 		Check if the item is in the heap
 
-		:math:`O(n)` or :math:`O(\log{n})`
+		:math:`O(n)` or :math:`O(n\log{n})`
 
 		>>> 1 in pminheap([(1,'a'), (2,'b'), (3,'c')]).keys()
 		True
@@ -181,7 +181,7 @@ class PHeapView(Generic[K,V,T], Collection[T]):
 		r'''
 		Iterate through the heap view
 
-		:math:`O(n)` or :math:`O(\log{n})`
+		:math:`O(n)` or :math:`O(n\log{n})`
 
 		>>> list(pminheap([(1,'a'), (2,'b'), (3,'c')]).keys())
 		[1, 2, 3]

@@ -56,14 +56,16 @@ class PSequenceBase(Generic[T]):
 	The following are examples of some common operations on persistent sequences:
 
 	>>> seq1 = psequence([1, 2, 3])
-	>>> seq2 = seq1.append(4)
-	>>> seq3 = seq1 + seq2
 	>>> seq1
 	psequence([1, 2, 3])
+	>>> seq2 = seq1.append(4)
 	>>> seq2
 	psequence([1, 2, 3, 4])
+	>>> seq3 = seq1 + seq2
 	>>> seq3
 	psequence([1, 2, 3, 1, 2, 3, 4])
+	>>> seq1
+	psequence([1, 2, 3])
 	>>> seq3[3]
 	1
 	>>> seq3[2:5]
