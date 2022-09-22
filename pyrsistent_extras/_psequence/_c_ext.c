@@ -3981,9 +3981,10 @@ static PyObject* PSequenceEvolver_popLeft(PSequenceEvolver* self) {
 			"pop from empty sequence");
 	FView view = FTree_viewLeft(self->seq->tree);
 	assert(view.node->size == 1);
+	PyObject* value = PObj_IncRef(view.node->value);
 	Py_DECREF(self->seq);
 	self->seq = PSequence_make(view.tree);
-	return PObj_IncRef(view.node->value);
+	return value;
 }
 
 static PyObject* PSequenceEvolver_popRight(PSequenceEvolver* self) {
@@ -3992,9 +3993,10 @@ static PyObject* PSequenceEvolver_popRight(PSequenceEvolver* self) {
 			"pop from empty sequence");
 	FView view = FTree_viewRight(self->seq->tree);
 	assert(view.node->size == 1);
+	PyObject* value = PObj_IncRef(view.node->value);
 	Py_DECREF(self->seq);
 	self->seq = PSequence_make(view.tree);
-	return PObj_IncRef(view.node->value);
+	return value;
 }
 
 static PyObject* PSequenceEvolver_pop(PSequenceEvolver* self, PyObject* args) {
