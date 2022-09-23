@@ -7,7 +7,10 @@ from distutils.command.build_ext import build_ext
 
 readme_path = os.path.join(os.path.dirname(__file__), 'README.rst')
 with codecs.open(readme_path, encoding='utf8') as f:
-    readme = f.read()
+    for line in f:
+        if line.startswith('.. include_start_after'):
+            break
+    long_description = f.read()
 
 extensions = []
 if platform.python_implementation() == 'CPython' and os.getenv('PYRSISTENT_SKIP_EXTENSION') is None:
@@ -64,7 +67,7 @@ setuptools.setup(
     name='pyrsistent-extras',
     version=__version__,
     description='Extra data structures for pyrsistent',
-    long_description=readme,
+    long_description=long_description,
     long_description_content_type='text/x-rst',
     author='mingmingrr',
     author_email='mingmingrr@gmail.com',
