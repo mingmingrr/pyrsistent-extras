@@ -860,7 +860,8 @@ class PSequenceEvolverBase(PSequenceBase[T]):
 		'''
 
 	@staticmethod
-	def _fromitems(iterable:Optional[Iterable[T]]=None) -> PSequenceBase[T]: ...
+	def _fromitems(iterable:Optional[Iterable[T]]=None) -> PSequenceBase[T]:
+		raise TypeError('PSequenceEvolver does not support _fromitems')
 
 # for doctest
 def psequence(*args, **kwargs):

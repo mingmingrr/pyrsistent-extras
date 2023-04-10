@@ -614,8 +614,8 @@ class PSequence(PSequenceBase[T]):
 		return self.delete(self.index(value))
 
 	def transform(self, *transformations) -> PSequence[T]:
-		from pyrsistent._transformations import transform
-		return transform(self, transformations)
+		from pyrsistent._transformations import transform # type: ignore
+		return transform(self, transformations) # type: ignore
 
 	def index(self, value, start:int=0, stop:int=cast(int,None)) -> int:
 		if stop is None: stop = self._size

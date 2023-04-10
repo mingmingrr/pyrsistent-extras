@@ -1,6 +1,6 @@
 from __future__ import annotations
-from typing import Collection, Iterable, Iterator, Hashable, \
-	ClassVar, TypeVar, Generic, Optional, Callable, Tuple, Any, Union, cast
+from typing import Collection, Iterable, Iterator, Hashable, ClassVar, \
+	TypeVar, Generic, Optional, Callable, Tuple, Any, Union, cast, overload
 from abc import abstractmethod
 
 import itertools
@@ -263,7 +263,11 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 		self._forest = _forest
 		return self
 
-	def push(self, key:K, value:V=cast(V,None)) -> PHeap[K,V]:
+	@overload
+	def push(self:PHeap[K,None], key:K) -> PHeap[K,None]: ...
+	@overload
+	def push(self:PHeap[K,V], key:K, value:V) -> PHeap[K,V]: ...
+	def push(self, key, value=None):
 		r'''
 		Inserts a value with the specified key
 
@@ -672,7 +676,11 @@ def pminheap(items:PHeapLike[K,V]=PMinHeap._empty) -> PMinHeap[K,V]:
 	'''
 	return cast(PMinHeap, PMinHeap._fromitems(items))
 
-def pminheap_fromkeys(items:Iterable[K], value:V=None) -> PMinHeap[K,V]:
+@overload
+def pminheap_fromkeys(items:Iterable[K]) -> PMinHeap[K,None]: ...
+@overload
+def pminheap_fromkeys(items:Iterable[K], value=V) -> PMinHeap[K,V]: ...
+def pminheap_fromkeys(items, value=None):
 	r'''
 	Create a :class:`PMinHeap` using a default value
 
@@ -683,8 +691,7 @@ def pminheap_fromkeys(items:Iterable[K], value:V=None) -> PMinHeap[K,V]:
 	>>> pminheap.fromkeys([1, 2, 3], value='a')
 	pminheap([(1, 'a'), (2, 'a'), (3, 'a')])
 	'''
-	val: V = cast(V, value)
-	return pminheap((item, val) for item in items)
+	return pminheap((item, value) for item in items)
 setattr(pminheap, 'fromkeys', pminheap_fromkeys)
 
 def hl(*items:Tuple[K,V]) -> PMinHeap[K,V]:
@@ -718,7 +725,11 @@ def pmaxheap(items:PHeapLike[K,V]=PMaxHeap._empty) -> PMaxHeap[K,V]:
 	'''
 	return cast(PMaxHeap, PMaxHeap._fromitems(items))
 
-def pmaxheap_fromkeys(items:Iterable[K], value:V=None) -> PMaxHeap[K,V]:
+@overload
+def pmaxheap_fromkeys(items:Iterable[K]) -> PMaxHeap[K,None]: ...
+@overload
+def pmaxheap_fromkeys(items:Iterable[K], value=V) -> PMaxHeap[K,V]: ...
+def pmaxheap_fromkeys(items, value=None):
 	r'''
 	Create a :class:`PMaxHeap` using a default value
 
@@ -729,8 +740,7 @@ def pmaxheap_fromkeys(items:Iterable[K], value:V=None) -> PMaxHeap[K,V]:
 	>>> pmaxheap.fromkeys([1, 2, 3], value='a')
 	pmaxheap([(3, 'a'), (2, 'a'), (1, 'a')])
 	'''
-	val: V = cast(V, value)
-	return pmaxheap((item, val) for item in items)
+	return pmaxheap((item, value) for item in items)
 setattr(pmaxheap, 'fromkeys', pmaxheap_fromkeys)
 
 def hg(*items:Tuple[K,V]) -> PMaxHeap[K,V]:
