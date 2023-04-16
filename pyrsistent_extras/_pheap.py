@@ -106,15 +106,15 @@ class Forest(Generic[K,V]):
 			self._tree.merge(other._tree, down))
 
 class PHeapView(Generic[K,V,T], Collection[T]):
-	__slots__ = ('_queue', '_sorted')
+	__slots__ = ('_heap', '_sorted')
 
 	if not sphinx_build:
-		_queue: PHeap[K,V]
+		_heap: PHeap[K,V]
 		_sorted: bool
 
-	def __new__(cls, _queue, _sorted):
+	def __new__(cls, _heap, _sorted):
 		self = super().__new__(cls)
-		self._queue = _queue
+		self._heap = _heap
 		self._sorted = _sorted
 		return self
 
@@ -146,12 +146,12 @@ class PHeapView(Generic[K,V,T], Collection[T]):
 		>>> len(pminheap([(1,'a'), (2,'b'), (3,'c')]).items())
 		3
 		'''
-		return self._queue._size
+		return self._heap._size
 
 	def _iter_unsorted(self) -> Iterator[Tuple[K,V]]:
-		if self._queue._size == 0: return
-		yield self._queue._key, self._queue._value
-		forest = self._queue._forest
+		if self._heap._size == 0: return
+		yield self._heap._key, self._heap._value
+		forest = self._heap._forest
 		stack:list[Tree[K,V]] = []
 		while forest is not None:
 			stack.append(forest._tree)
@@ -166,9 +166,9 @@ class PHeapView(Generic[K,V,T], Collection[T]):
 			forest = forest._next
 
 	def _iter_sorted(self) -> Iterator[Tuple[K,V]]:
-		queue = self._queue
-		while queue._size > 0:
-			key, value, queue = queue.pop()
+		heap = self._heap
+		while heap._size > 0:
+			key, value, heap = heap.pop()
 			yield key, value
 
 	def _iter(self) -> Iterator[Tuple[K,V]]:
