@@ -1,10 +1,13 @@
 from abc import abstractmethod
-from typing import Any, Iterator, TypeVar, Optional, Union, Tuple, Callable
+from typing import Any, Iterator, TypeVar, Optional, Union, Tuple, Callable, \
+	MappingView, KeysView, ValuesView, ItemsView, Generic, cast
 from typing_extensions import Protocol
 
 import builtins
 import platform
 import os
+
+NOTHING = cast(Any, object())
 
 class Comparable(Protocol):
 	@abstractmethod
@@ -13,6 +16,7 @@ class Comparable(Protocol):
 	def __eq__(self, other: Any) -> bool: ...
 
 K = TypeVar('K', bound=Comparable)
+V = TypeVar('V')
 
 def compare_single(x:K, y:K, equality:bool) -> int:
 	if x == y: return 0
@@ -40,9 +44,10 @@ def compare_iter(xs:Any, ys:Any, equality:bool) -> int:
 		if xs is ys: return 0
 		try:
 			xl, yl = len(xs), len(ys)
-			if xl != yl: return 1
 		except TypeError:
 			pass
+		else:
+			if xl != yl: return 1
 	try:
 		xs, ys = iter(xs), iter(ys)
 	except TypeError:
@@ -61,9 +66,23 @@ def check_index(length:int, index:int) -> int:
 		raise IndexError('index out of range: ' + str(index))
 	return idx
 
+def trace(*args, **kwargs):
+	print(*args, **kwargs)
+	return args[-1]
+
 sphinx_build: bool = getattr(builtins, '__sphinx_build__', False)
 
 try_c_ext: bool = not sphinx_build \
 	and platform.python_implementation() == 'CPython' \
 	and not os.environ.get('PYRSISTENT_NO_C_EXTENSION')
 
+def keys_from_items(self):
+	for k, v in self._items():
+		yield k
+
+def values_from_items(self):
+	for k, v in self._items():
+		yield v
+
+def items_from_items(self):
+	return self._items()

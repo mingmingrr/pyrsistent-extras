@@ -167,6 +167,7 @@ def test_merge(args):
 	items = list(sorted(items1 + items2))
 	assert check_heap(heap1.merge(heap2)) == items
 	assert check_heap(heap1 + heap2) == items
+	assert check_heap(heap1 | heap2) == items
 
 @given(pheaps(items=smallitems(10)), st.integers())
 def test_contains(heapitems, key):

@@ -14,6 +14,18 @@ K = TypeVar('K', bound=Comparable)
 V = TypeVar('V')
 
 class Tree(Generic[K,V]):
+	# binomial tree with child nodes stored as a linked list
+
+	# a "classic" binomial tree looks like the left
+	# this implementation looks like the right
+	#       A           A
+	#     / | \        /
+	#   B   F  H      B--F--H
+	#  / \  |        /   |
+	# C   D G       C--D G
+	# |             |
+	# E             E
+
 	__slots__ = ('_key', '_value', '_child', '_sibling')
 
 	_key: K
@@ -334,6 +346,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 		return type(self)(self._size + other._size, self._key, self._value, forest)
 
 	__add__ = merge
+	__or__ = merge
 
 	def peek(self) -> Tuple[K,V]:
 		r'''
