@@ -615,7 +615,7 @@ class PSequence(PSequenceBase[T]):
 
 	def transform(self, *transformations) -> PSequence[T]:
 		from pyrsistent._transformations import transform # type: ignore
-		return transform(self, transformations) # type: ignore
+		return cast(Any, transform)(self, transformations)
 
 	def index(self, value, start:int=0, stop:int=cast(int,None)) -> int:
 		if stop is None: stop = self._size

@@ -1332,6 +1332,8 @@ static FTree* FTree_fromNodes(size_t size, size_t count, FNode** nodes) {
 
 static PSequence* PSequence_fromIterable(PyObject* sequence) {
 	assert(sequence != NULL);
+	if(sequence == Py_None)
+		return PObj_IncRef(EMPTY_SEQUENCE);
 	if(Py_TYPE(sequence) == &PSequenceType)
 		return PObj_IncRef(sequence);
 	if(Py_TYPE(sequence) == &PSequenceEvolverType)

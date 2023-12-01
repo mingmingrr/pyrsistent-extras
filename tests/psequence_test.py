@@ -15,7 +15,7 @@ import datetime
 
 hypothesis.settings.register_profile('pypy',
 	max_examples=10,
-	deadline=datetime.timedelta(milliseconds=500),
+	deadline=datetime.timedelta(milliseconds=1000),
 	suppress_health_check=[hypothesis.HealthCheck.data_too_large])
 
 default_depth = 4
@@ -27,9 +27,7 @@ if platform.python_implementation() == 'PyPy': # pragma: no cover
 # {{{ strategies
 
 class RefInt(int):
-	'''
-	integer type that tracks garbage collection
-	'''
+	'integer type that tracks garbage collection'
 	count = 0
 	def __new__(cls, *args, **kwargs):
 		RefInt.count += 1
@@ -42,9 +40,7 @@ IndexSeq = object()
 
 @functools.lru_cache(maxsize=None)
 def fingernodes(elements, depth):
-	'''
-	generate a Node
-	'''
+	'generate a Node'
 	if depth <= 0: return st.builds(lambda x: ('Node', 1, x), elements)
 	node = fingernodes(elements, depth-1)
 	return st.builds(lambda xs: ('Node', sum(x[1] for x in xs), *xs),
@@ -52,18 +48,14 @@ def fingernodes(elements, depth):
 
 @functools.lru_cache(maxsize=None)
 def fingerdigits(elements, depth):
-	'''
-	generate a Digit
-	'''
+	'generate a Digit'
 	node = fingernodes(elements, depth)
 	return st.builds(lambda xs: ('Digit', sum(x[1] for x in xs), *xs),
 		st.lists(node, min_size=1, max_size=4))
 
 @functools.lru_cache(maxsize=None)
 def fingertrees(elements, depth, max_depth):
-	'''
-	generate a Tree
-	'''
+	'generate a Tree'
 	if depth >= max_depth: return st.just(('Tree', 0))
 	node = fingernodes(elements, depth)
 	digit = fingerdigits(elements, depth)
@@ -73,17 +65,13 @@ def fingertrees(elements, depth, max_depth):
 			digit, tree, digit))
 
 def psequences(elements=st.integers(), max_depth=default_depth):
-	'''
-	generate a PSequence as its tuple representation
-	'''
+	'generate a PSequence as its tuple representation'
 	return st.one_of(fingertrees(elements, 0, depth)
 		for depth in range(max_depth + 1))
 
 @st.composite
 def indexseqs(draw, count=1, scale=2, *args, **kwargs):
-	'''
-	generate an int-PSequence pair
-	'''
+	'generate an int-PSequence pair'
 	seq = draw(psequences(*args, **kwargs))
 	length = seq[1]
 	ns = draw(st.lists(st.integers(
@@ -128,9 +116,7 @@ def check_tree(tree, depth, acc):
 	return size
 
 def check_seq(seq):
-	'''
-	check invariants of PSequence while converting it to a list
-	'''
+	'check invariants of PSequence while converting it to a list'
 	acc = []
 	check_tree(seq._totree(), 0, acc)
 	return acc
@@ -140,9 +126,7 @@ def check_seq(seq):
 # {{{ decorators
 
 def iter_tree(tree):
-	'''
-	flatten tree representation of PSequence
-	'''
+	'flatten tree representation of PSequence'
 	ftype, size, *items = tree
 	if size == 1 and ftype == 'Node':
 		yield items[0]
@@ -151,9 +135,7 @@ def iter_tree(tree):
 			yield from iter_tree(item)
 
 def with_list(items):
-	'''
-	track gc for list
-	'''
+	'track gc for list'
 	return [RefInt(item) for item in items]
 
 def with_fingertree(tree):
@@ -163,23 +145,23 @@ def with_fingertree(tree):
 	return (ftype, size, *map(with_fingertree, items))
 
 def with_psequence(tree):
-	'''
-	track gc for PSequence
-	'''
+	'track gc for PSequence'
 	tree = with_fingertree(tree)
 	items = list(iter_tree(tree))
 	tree = PSequence._fromtree(tree)
 	return tree, items
 
+def with_indexseq(indextree):
+	*index, tree = indextree
+	return (*map(RefInt, index), *with_psequence(tree))
+
 def check_garbage(func):
-	'''
-	check all garbage is collected properly
-	'''
+	'check all garbage is collected properly'
 	types = {k: {
 		int: RefInt,
 		list: with_list,
 		PSequence: with_psequence,
-		IndexSeq: lambda xs: (*map(RefInt, xs[:-1]), *with_psequence(xs[-1])),
+		IndexSeq: with_indexseq,
 	}.get(v, lambda x: x) for k, v in typing.get_type_hints(func).items()}
 	@functools.wraps(func)
 	def inner(*args, **kwargs):

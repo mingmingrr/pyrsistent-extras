@@ -687,16 +687,7 @@ class PSequenceBase(Generic[T]):
 	@staticmethod
 	@abstractmethod
 	def _fromitems(iterable:Optional[Iterable[T]]=None) -> PSequenceBase[T]:
-		r'''
-		Create a :class:`PSequence` from the given items
-
-		:math:`O(n)`
-
-		>>> psequence()
-		psequence([])
-		>>> psequence([1,2,3,4])
-		psequence([1, 2, 3, 4])
-		'''
+		pass
 
 class PSequenceEvolverBase(PSequenceBase[T]):
 	r'''

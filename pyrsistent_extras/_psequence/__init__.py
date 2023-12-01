@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Sequence, Hashable, MutableSequence
-from typing import TypeVar, Tuple
+from typing import TypeVar, Tuple, Optional, Iterable
 
 import os
 import platform
@@ -27,7 +27,18 @@ Sequence.register(PSequence)
 Hashable.register(PSequence)
 MutableSequence.register(Evolver)
 
-psequence = PSequence._fromitems
+def psequence(iterable:Optional[Iterable[T]]=None):
+	r'''
+	Create a :class:`PSequence` from the given items
+
+	:math:`O(n)`
+
+	>>> psequence()
+	psequence([])
+	>>> psequence([1,2,3,4])
+	psequence([1, 2, 3, 4])
+	'''
+	return PSequence._fromitems(iterable)
 
 def sq(*elements:T) -> PSequence[T]:
 	'''
