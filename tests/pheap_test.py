@@ -1,5 +1,6 @@
 from pyrsistent_extras import \
 	hl, pminheap, PMinHeap, hg, pmaxheap, PMaxHeap
+import pyrsistent_extras.lenses
 
 import hypothesis
 from hypothesis import given, strategies as st
@@ -8,6 +9,7 @@ import collections
 import pickle
 import pytest
 import bisect
+from lenses import lens
 
 def pitems(keys=st.integers(), values=st.integers()):
 	return st.tuples(keys, values)
@@ -284,5 +286,16 @@ def test_items(heapitems):
 		assert (k, v) in heap.items()
 		assert ((k, v + 1) in heap.items()) \
 			== any(n == (k, v + 1) for n in items)
+
+@given(pheaps(items=pitems(values=st.just(None))), st.integers())
+def test_lenses(heapitems, key):
+	heap, items = heapitems
+	assert check_heap(lens.Contains(key).set(True)(heap)) \
+		== (items if (key, None) in items else sorted(items + [(key, None)]))
+	assert check_heap(lens.Contains(key).set(False)(heap)) \
+		== [(k, v) for k, v in items if k != key]
+	assert check_heap(lens.Each().modify(lambda xs: (xs[0] * 2, xs[1]))(heap)) \
+		== [(k * 2, v) for k, v in items]
+	assert check_heap(heap) == items
 
 # vim: set foldmethod=marker:

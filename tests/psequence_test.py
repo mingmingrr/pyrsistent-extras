@@ -1,4 +1,5 @@
 from pyrsistent_extras import psequence, PSequence, sq
+import pyrsistent_extras.lenses
 
 import hypothesis
 from hypothesis import given, strategies as st
@@ -12,6 +13,7 @@ import gc
 import os
 import platform
 import datetime
+from lenses import lens
 
 hypothesis.settings.register_profile('pypy',
 	max_examples=10,
@@ -1190,6 +1192,28 @@ def test_evolver_hash(seqitems:PSequence):
 	seq, items = seqitems
 	evo = seq.evolver()
 	assert hash(seq) == hash(psequence(items))
+
+@given(indexseqs(), st.integers())
+@check_garbage
+def test_lenses(iseqitems:IndexSeq, item:int):
+	index, seq, items = iseqitems
+	getter = lens[index].get()
+	setter = lens[index].set(item)
+	remove = lens.Contains(item).set(False)
+	adder = lens.Contains(item).set(True)
+	each = lens.Each().modify(lambda x: x * 2)
+	if -len(items) <= index < len(items):
+		assert getter(seq) == getter(items)
+		assert check_seq(setter(seq)) == setter(items[:])
+	else:
+		with pytest.raises(IndexError):
+			assert getter(seq)
+		with pytest.raises(IndexError):
+			assert setter(seq)
+	assert check_seq(remove(seq)) == remove(items[:])
+	assert check_seq(adder(seq)) == adder(items[:])
+	assert check_seq(each(seq)) == each(items[:])
+	assert check_seq(seq) == items
 
 # }}}
 
