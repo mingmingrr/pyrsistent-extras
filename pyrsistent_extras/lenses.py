@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import *
 
-from ._util import Comparable
+from ._utility import Comparable
 
 from ._pheap import PMinHeap, pminheap, PMaxHeap, pmaxheap
 from ._psequence import PSequence, psequence

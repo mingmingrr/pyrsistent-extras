@@ -7,7 +7,7 @@ import itertools
 import operator
 import builtins
 
-from ._util import Comparable, compare_next, compare_iter, sphinx_build
+from ._utility import Comparable, compare_next, compare_iter, sphinx_build
 
 T = TypeVar('T')
 K = TypeVar('K', bound=Comparable)

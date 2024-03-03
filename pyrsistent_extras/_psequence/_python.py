@@ -8,7 +8,7 @@ import itertools
 import builtins
 
 from ._base import PSequenceBase, PSequenceEvolverBase
-from .._util import compare_iter, check_index, sphinx_build
+from .._utility import compare_iter, check_index, sphinx_build
 
 T = TypeVar('T')
 

@@ -6,7 +6,7 @@ import os
 import platform
 import builtins
 
-from .._util import sphinx_build, try_c_ext
+from .._utility import sphinx_build, try_c_ext
 
 use_c_ext = False
 # Use the C extension as underlying implementation if it is available
