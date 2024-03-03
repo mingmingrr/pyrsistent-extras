@@ -485,7 +485,7 @@ static FIter* FIter_decRef(FIter* iter) {
 // {{{ FNode
 
 static FNode* FNode_alloc() {
-	FNode* node = PyMem_Malloc(sizeof(FNode));
+	FNode* node = (FNode*)PyMem_Malloc(sizeof(FNode));
 	node->refs = 1;
 	FRefs_inc(FNodeR);
 	return node;
@@ -537,7 +537,7 @@ static FNode* FNode_makeE(const PyObject* item) {
 // {{{ FDigit
 
 static FDigit* FDigit_alloc() {
-	FDigit* digit = PyMem_Malloc(sizeof(FDigit));
+	FDigit* digit = (FDigit*)PyMem_Malloc(sizeof(FDigit));
 	digit->refs = 1;
 	FRefs_inc(FDigitR);
 	return digit;
@@ -639,7 +639,7 @@ static FDigit* FDigit_fromMerge(FMerge merge) {
 // {{{ FTree
 
 static FTree* FTree_alloc() {
-	FTree* tree = PyMem_Malloc(sizeof(FTree));
+	FTree* tree = (FTree*)PyMem_Malloc(sizeof(FTree));
 	tree->refs = 1;
 	FRefs_inc(FTreeR);
 	return tree;
@@ -658,7 +658,7 @@ static FTree* FSingle_make(const FNode* node) {
 }
 
 static FDeep* FDeep_alloc() {
-	FDeep* deep = PyMem_Malloc(sizeof(FDeep));
+	FDeep* deep = (FDeep*)PyMem_Malloc(sizeof(FDeep));
 	return deep;
 }
 
@@ -754,7 +754,7 @@ static void PSequence_dealloc(PSequence* self) {
 // {{{ FIter
 
 static inline FIter* FIter_alloc() {
-	return PyMem_Malloc(sizeof(FIter));
+	return (FIter*)PyMem_Malloc(sizeof(FIter));
 }
 
 static inline FIter* FIter_make(
@@ -1341,7 +1341,7 @@ static PSequence* PSequence_fromIterable(PyObject* sequence) {
 	PyObject* seq = PySequence_Fast(sequence, "expected a sequence");
 	if(seq == NULL) return NULL;
 	Py_ssize_t size = PySequence_Fast_GET_SIZE(seq);
-	FNode** nodes = PyMem_Malloc(size * sizeof(FNode*));
+	FNode** nodes = (FNode**)PyMem_Malloc(size * sizeof(FNode*));
 	PyObject** iter = PySequence_Fast_ITEMS(seq);
 	for(Py_ssize_t i = 0; i < size; ++i)
 		nodes[i] = FNode_makeE(PObj_IncRef(*iter++));
@@ -1821,7 +1821,7 @@ static PSequence* PSequence_msetItemN(PSequence* self, PyObject* args) {
 	Py_ssize_t argc = PyTuple_GET_SIZE(args);
 	if(argc == 0) return PObj_IncRef(self);
 	FMset mset = { .index = 0, .count = 0, .items = NULL };
-	FIndex2* items = (mset.items = PyMem_Malloc(argc * sizeof(FIndex2)));
+	FIndex2* items = (mset.items = (FIndex2*)PyMem_Malloc(argc * sizeof(FIndex2)));
 	items = items;
 	for(Py_ssize_t i = 0; i < argc; ++i)
 		items[i].value = NULL;
@@ -3178,7 +3178,7 @@ static PSequence* PSequence_getSlice(PSequence* self, PyObject* slice) {
 			tree = FTree_decRefRet(tree,
 				FTree_takeRight(tree, stop - start).tree);
 	} else {
-		FNode** nodes = PyMem_Malloc(count * sizeof(PyObject*));
+		FNode** nodes = (FNode**)PyMem_Malloc(count * sizeof(PyObject*));
 		FSlice slice = {
 			.modulo = start,
 			.count = count,
@@ -3366,7 +3366,7 @@ static PSequence* PSequence_setSlice(
 	if(step < 0) {
 		Py_ssize_t tstart = start + (count - 1) * step;
 		stop = start + 1; start = tstart;
-		PyObject** buf = PyMem_MALLOC(count * sizeof(PyObject*));
+		PyObject** buf = (PyObject**)PyMem_MALLOC(count * sizeof(PyObject*));
 		for(Py_ssize_t i = 0, j = count - 1; i < count; ++i, --j)
 			buf[i] = items[j];
 		items = buf;
