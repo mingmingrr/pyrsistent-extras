@@ -12,8 +12,6 @@ Pyrsistent-Extras
 .. image:: https://badge.fury.io/py/pyrsistent-extras.svg
 	:target: https://badge.fury.io/py/pyrsistent-extras
 
-.. include_start_after
-
 Extra data structures for `pyrsistent <http://github.com/tobgu/pyrsistent>`_
 
 Below are examples of common usage patterns for some of the structures and

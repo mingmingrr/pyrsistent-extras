@@ -1,3 +1,106 @@
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = [
+	"cmake",
+	"scikit-build-core",
+	"nanobind",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "pyrsistent_extras"
+version = "0.1.0"
+description = "Extra data structures for pyrsistent"
+readme = "README.rst"
+license = { file = "LICENSE.mit" }
+requires-python = ">=3.7"
+authors = [ { name = "mingmingrr", email = "mingmingrr@gmail.com" } ]
+dependencies = [
+	"typing-extensions",
+]
+classifiers = [
+	"Intended Audience :: Developers",
+	"License :: OSI Approved :: MIT License",
+	"Operating System :: OS Independent",
+	"Programming Language :: Python :: 3.7",
+	"Programming Language :: Python :: 3.8",
+	"Programming Language :: Python :: 3.9",
+	"Programming Language :: Python :: 3.10",
+	"Programming Language :: Python :: 3.11",
+	"Programming Language :: Python :: 3.12",
+	"Programming Language :: Python :: Implementation :: PyPy",
+]
+
+[project.optional-dependencies]
+test = [
+	"pyrsistent",
+	"lenses",
+	"pytest",
+	"hypothesis",
+]
+docs = [
+	"sphinx",
+	"sphinx_rtd_theme",
+]
+
+[project.urls]
+Homepage = "https://github.com/mingmingrr/pyrsistent-extras"
+Changelog = "https://github.com/mingmingrr/pyrsistent-extras/blob/master/CHANGELOG.md"
+Docs = "https://pyrsistent-extras.readthedocs.io/en/latest"
+Issues = "https://github.com/mingmingrr/pyrsistent-extras/issues"
+
+[tool.scikit-build]
+minimum-version = "0.4"
+build-dir = "build/{wheel_tag}"
+wheel.py-api = "cp312"
+
+[tool.mypy]
+
+[[tool.mypy.overrides]]
+module = "lenses"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = [
+	"--showlocals",
+	"--doctest-modules",
+	"--new-first",
+	"--failed-first",
+	"--capture", "no",
+	"--no-header",
+]
+doctest_optionflags =  [
+	"ELLIPSIS",
+	"NORMALIZE_WHITESPACE",
+	"IGNORE_EXCEPTION_DETAIL",
+]
+testpaths = [
+	"pyrsistent_extras",
+	"tests",
+]
+
+[tool.tox]
+legacy_tox_ini = """
+	[tox]
+	envlist = py37,py38,py39,py310,pypy3,no-c-ext-py310
+
+	[gh-actions]
+	python =
+		3.7: py37
+		3.8: py38
+		3.10: py310, no-c-ext-py310
+		3.9: py39
+
+	[testenv]
+	passenv =
+		PYTEST_ADDOPTS
+	commands =
+		{envpython} {toxinidir}/setup.py pytest
+	deps =
+		-r requirements.txt
+		-r requirements_dev.txt
+
+	[testenv:no-c-ext-py310]
+	basepython = python3.10
+	setenv =
+		PYRSISTENT_NO_C_EXTENSION = 1
+"""

@@ -1,5 +1,0 @@
-pyrsistent
-pytest
-pytest-xdist
-hypothesis
-lenses
