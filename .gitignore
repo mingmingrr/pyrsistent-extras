@@ -1,0 +1,9 @@
+.*
+!.github
+!.gitignore
+*.so
+*.egg-info
+__pycache__
+build
+benchmark
+dist
