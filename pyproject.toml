@@ -74,7 +74,7 @@ doctest_optionflags =  [
 	"IGNORE_EXCEPTION_DETAIL",
 ]
 testpaths = [
-	"pyrsistent_extras",
+	"src",
 	"tests",
 ]
 

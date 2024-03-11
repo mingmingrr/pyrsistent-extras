@@ -13,7 +13,7 @@ find_package(Python 3.7
 find_package(nanobind CONFIG REQUIRED)
 
 python_add_library(_c_ext MODULE
-	pyrsistent_extras/_psequence/_c_ext.c WITH_SOABI)
+	src/pyrsistent_extras/_psequence/_c_ext.c WITH_SOABI)
 install(TARGETS _c_ext
 	LIBRARY DESTINATION pyrsistent_extras/_psequence)
 
