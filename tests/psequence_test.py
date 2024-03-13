@@ -171,9 +171,10 @@ def check_garbage(func):
 		int0, ref0 = RefInt.count, PSequence._refcount()
 		kwargs = inspect.getcallargs(func, *args, **kwargs)
 		result =  func(**{k: types[k](v) for k, v in kwargs.items()})
-		gc.collect(0)
-		assert PSequence._refcount() == ref0, 'tree ref count'
-		assert RefInt.count == int0, 'int ref count'
+		if platform.python_implementation() == 'CPython':
+			gc.collect(0)
+			assert PSequence._refcount() == ref0, 'tree ref count'
+			assert RefInt.count == int0, 'int ref count'
 		return result
 	inner.__signature__ = inspect.signature(func)
 	return inner
@@ -183,11 +184,8 @@ def check_garbage(func):
 # {{{ test_psequence
 
 def test_c_ext(): # pragma: no cover
-	if platform.python_implementation() == 'CPython' \
-			and not os.environ.get('PYRSISTENT_NO_C_EXTENSION'):
-		import pyrsistent_extras._psequence._c_ext
-	else:
-		pytest.skip()
+	if os.environ.get('PYRSISTENT_NO_C_EXTENSION'): pytest.skip()
+	import pyrsistent_extras._psequence._c_ext
 
 @given(psequences())
 @check_garbage

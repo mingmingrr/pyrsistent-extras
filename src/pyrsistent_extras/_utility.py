@@ -73,7 +73,6 @@ def trace(*args, **kwargs):
 sphinx_build: bool = getattr(builtins, '__sphinx_build__', False)
 
 try_c_ext: bool = not sphinx_build \
-	and platform.python_implementation() == 'CPython' \
 	and not os.environ.get('PYRSISTENT_NO_C_EXTENSION')
 
 def keys_from_items(self):

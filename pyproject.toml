@@ -81,14 +81,14 @@ testpaths = [
 [tool.tox]
 legacy_tox_ini = """
 	[tox]
-	envlist = py37,py38,py39,py310,pypy3,no-c-ext-py310
+	envlist = py37,py38,py39,py310,pypy3
 
 	[gh-actions]
 	python =
 		3.7: py37
 		3.8: py38
-		3.10: py310, no-c-ext-py310
 		3.9: py39
+		3.10: py310
 
 	[testenv]
 	passenv =
@@ -98,9 +98,4 @@ legacy_tox_ini = """
 	deps =
 		-r requirements.txt
 		-r requirements_dev.txt
-
-	[testenv:no-c-ext-py310]
-	basepython = python3.10
-	setenv =
-		PYRSISTENT_NO_C_EXTENSION = 1
 """

@@ -8,18 +8,7 @@ import builtins
 
 from .._utility import sphinx_build, try_c_ext
 
-use_c_ext = False
-# Use the C extension as underlying implementation if it is available
-if try_c_ext: # pragma: no cover
-	try:
-		from ._c_ext import PSequence, Evolver # type: ignore
-		use_c_ext = True
-	except ImportError as err:
-		import warnings
-		warnings.warn('failed to import C extension for PSequence', ImportWarning)
-
-if not use_c_ext:
-	from ._python import PSequence, Evolver
+from ._c_ext import PSequence, Evolver # type: ignore
 
 T = TypeVar('T')
 
