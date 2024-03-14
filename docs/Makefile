@@ -4,13 +4,9 @@ SOURCEDIR    = source
 BUILDDIR     = build
 
 .PHONY: default
-default: help
+default: html
 
-.PHONY: help
-help:
-	$(SPHINXBUILD) -b help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-
-.PHONY: Makefile
-%: Makefile
-	$(SPHINXBUILD) -b $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+.PHONY: html
+html:
+	$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 

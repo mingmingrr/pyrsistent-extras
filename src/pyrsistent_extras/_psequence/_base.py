@@ -17,7 +17,7 @@ T = TypeVar('T')
 #   own type to avoid packing FingerTree with three extra pointers
 # - indexing by negative indices operates on items starting from the right
 
-class PSequenceBase(Generic[T]):
+class PSequence(Generic[T]):
 	r'''
 	Persistent sequence
 
@@ -161,7 +161,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def extendleft(self, other:Union[PSequenceBase[T], Iterable[T]]) -> PSequenceBase[T]:
+	def extendleft(self, other:Union[PSequence[T], Iterable[T]]) -> PSequence[T]:
 		r'''
 		Concatenate two sequences
 
@@ -174,7 +174,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def extendright(self, other:Union[PSequenceBase[T], Iterable[T]]) -> PSequenceBase[T]:
+	def extendright(self, other:Union[PSequence[T], Iterable[T]]) -> PSequence[T]:
 		r'''
 		Concatenate two sequences
 
@@ -192,7 +192,7 @@ class PSequenceBase(Generic[T]):
 
 	extend = extendright
 
-	def __add__(self, other:Union[PSequenceBase[T], Iterable[T]]) -> PSequenceBase[T]:
+	def __add__(self, other:Union[PSequence[T], Iterable[T]]) -> PSequence[T]:
 		r'''
 		Concatenate two sequences
 
@@ -210,7 +210,7 @@ class PSequenceBase(Generic[T]):
 	@overload
 	def __getitem__(self, index:int) -> T: ...
 	@overload
-	def __getitem__(self, index:slice) -> PSequenceBase[T]: ...
+	def __getitem__(self, index:slice) -> PSequence[T]: ...
 	@abstractmethod
 	def __getitem__(self, index):
 		r'''
@@ -235,9 +235,9 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@overload
-	def set(self, index:int, value:T) -> PSequenceBase[T]: ...
+	def set(self, index:int, value:T) -> PSequence[T]: ...
 	@overload
-	def set(self, index:slice, value:Iterable[T]) -> PSequenceBase[T]: ...
+	def set(self, index:slice, value:Iterable[T]) -> PSequence[T]: ...
 	@abstractmethod
 	def set(self, index, value):
 		r'''
@@ -262,7 +262,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def mset(self, *values:Tuple[int,T]) -> PSequenceBase[T]:
+	def mset(self, *values:Tuple[int,T]) -> PSequence[T]:
 		r'''
 		Replace multiple elements
 
@@ -281,7 +281,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def insert(self, index:int, value:T) -> PSequenceBase[T]:
+	def insert(self, index:int, value:T) -> PSequence[T]:
 		r'''
 		Insert an element at the specified position
 
@@ -296,11 +296,11 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@overload
-	def delete(self, index:int) -> PSequenceBase[T]: ...
+	def delete(self, index:int) -> PSequence[T]: ...
 	@overload
-	def delete(self, index:slice) -> PSequenceBase[T]: ...
+	def delete(self, index:slice) -> PSequence[T]: ...
 	@abstractmethod
-	def delete(self, index) -> PSequenceBase[T]:
+	def delete(self, index) -> PSequence[T]:
 		r'''
 		Delete the element(s) at the specified position(s)
 
@@ -323,7 +323,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def remove(self, value:T) -> PSequenceBase[T]:
+	def remove(self, value:T) -> PSequence[T]:
 		r'''
 		Remove an element by value
 
@@ -340,7 +340,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def __mul__(self, times:int) -> PSequenceBase[T]:
+	def __mul__(self, times:int) -> PSequence[T]:
 		r'''
 		Repeat the sequence k times
 
@@ -435,7 +435,7 @@ class PSequenceBase(Generic[T]):
 	__str__ = __repr__
 
 	@abstractmethod
-	def appendleft(self, value:T) -> PSequenceBase[T]:
+	def appendleft(self, value:T) -> PSequence[T]:
 		r'''
 		Add an element to the left end
 
@@ -446,7 +446,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def appendright(self, value:T) -> PSequenceBase[T]:
+	def appendright(self, value:T) -> PSequence[T]:
 		r'''
 		Add an element to the right end
 
@@ -489,7 +489,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def splitat(self, index:int) -> Tuple[PSequenceBase[T], PSequenceBase[T]]:
+	def splitat(self, index:int) -> Tuple[PSequence[T], PSequence[T]]:
 		r'''
 		Split a sequence at a given position
 
@@ -509,7 +509,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def chunksof(self, size:int) -> PSequenceBase[Sequence[T]]:
+	def chunksof(self, size:int) -> PSequence[Sequence[T]]:
 		r'''
 		Split the sequence into chunks
 
@@ -556,7 +556,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def viewleft(self) -> Tuple[T, PSequenceBase[T]]:
+	def viewleft(self) -> Tuple[T, PSequence[T]]:
 		r'''
 		Analyse the left end
 
@@ -573,7 +573,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def viewright(self) -> Tuple[PSequenceBase[T], T]:
+	def viewright(self) -> Tuple[PSequence[T], T]:
 		r'''
 		Analyse the right end
 
@@ -590,7 +590,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def view(self, *index:int) -> Tuple[Union[T, PSequenceBase[T]], ...]:
+	def view(self, *index:int) -> Tuple[Union[T, PSequence[T]], ...]:
 		r'''
 		Split a sequence on the given position(s)
 
@@ -621,7 +621,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def reverse(self) -> PSequenceBase[T]:
+	def reverse(self) -> PSequence[T]:
 		r'''
 		Reverse the sequence
 
@@ -654,7 +654,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def transform(self, transformations) -> PSequenceBase[T]:
+	def transform(self, transformations) -> PSequence[T]:
 		r'''
 		Apply one or more transformations
 
@@ -664,7 +664,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def evolver(self) -> PSequenceEvolverBase[T]:
+	def evolver(self) -> PSequenceEvolver[T]:
 		r'''
 		Create an :class:`Evolver`
 
@@ -672,7 +672,7 @@ class PSequenceBase(Generic[T]):
 		'''
 
 	@abstractmethod
-	def sort(self, *args, **kwargs) -> PSequenceBase[T]:
+	def sort(self, *args, **kwargs) -> PSequence[T]:
 		r'''
 		Creat a sorted copy of the sequence
 
@@ -686,10 +686,10 @@ class PSequenceBase(Generic[T]):
 
 	@staticmethod
 	@abstractmethod
-	def _fromitems(iterable:Optional[Iterable[T]]=None) -> PSequenceBase[T]:
+	def _fromitems(iterable:Optional[Iterable[T]]=None) -> PSequence[T]:
 		pass
 
-class PSequenceEvolverBase(PSequenceBase[T]):
+class PSequenceEvolver(PSequence[T]):
 	r'''
 	Evolver for :class:`PSequence`
 
@@ -788,7 +788,7 @@ class PSequenceEvolverBase(PSequenceBase[T]):
 	@overload
 	def pop(self, index:Optional[int]=None) -> T: ...
 	@overload
-	def pop(self, index:slice) -> PSequenceBase[T]: ...
+	def pop(self, index:slice) -> PSequence[T]: ...
 	@abstractmethod
 	def pop(self, index=None):
 		r'''
@@ -810,7 +810,7 @@ class PSequenceEvolverBase(PSequenceBase[T]):
 		'''
 
 	@abstractmethod
-	def copy(self) -> PSequenceEvolverBase[T]:
+	def copy(self) -> PSequenceEvolver[T]:
 		r'''
 		Return a shallow copy of the sequence
 
@@ -826,7 +826,7 @@ class PSequenceEvolverBase(PSequenceBase[T]):
 		'''
 
 	@abstractmethod
-	def clear(self) -> PSequenceEvolverBase[T]:
+	def clear(self) -> PSequenceEvolver[T]:
 		r'''
 		Remove all items from the sequence
 
@@ -839,7 +839,7 @@ class PSequenceEvolverBase(PSequenceBase[T]):
 		'''
 
 	@abstractmethod
-	def persistent(self) -> PSequenceBase[T]:
+	def persistent(self) -> PSequence[T]:
 		r'''
 		Extract the sequence from the evolver
 
@@ -851,7 +851,7 @@ class PSequenceEvolverBase(PSequenceBase[T]):
 		'''
 
 	@staticmethod
-	def _fromitems(iterable:Optional[Iterable[T]]=None) -> PSequenceBase[T]:
+	def _fromitems(iterable:Optional[Iterable[T]]=None) -> PSequence[T]:
 		raise TypeError('PSequenceEvolver does not support _fromitems')
 
 # for doctest
@@ -859,4 +859,4 @@ def psequence(*args, **kwargs):
 	from pyrsistent_extras import psequence as pseq
 	return pseq(*args, **kwargs)
 
-__all__ = ('PSequenceBase', 'PSequencePSequenceEvolverBase')
+__all__ = ('PSequence', 'PSequencePSequenceEvolver')

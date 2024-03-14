@@ -4236,10 +4236,10 @@ bool pyrsistent_psequence_inheritDocs() {
 	PyObject* module = PyImport_ImportModule("pyrsistent_extras._psequence._base");
 	if(module == NULL) goto err0;
 
-	PyObject* seqbase = PyObject_GetAttrString(module, "PSequenceBase");
+	PyObject* seqbase = PyObject_GetAttrString(module, "PSequence");
 	if(seqbase == NULL) goto err1;
 	if(PSequenceType.tp_doc == NULL)
-		PSequenceType.tp_doc = PObj_getDoc("PSequenceBase", module);
+		PSequenceType.tp_doc = PObj_getDoc("PSequence", module);
 	if(PSequenceType.tp_doc == NULL) goto err1;
 
 	for(struct PyMethodDef* methdef = PSequenceType.tp_methods;
@@ -4256,10 +4256,10 @@ bool pyrsistent_psequence_inheritDocs() {
 		if(methdef->doc == NULL) goto err2;
 	}
 
-	PyObject* evobase = PyObject_GetAttrString(module, "PSequenceEvolverBase");
+	PyObject* evobase = PyObject_GetAttrString(module, "PSequenceEvolver");
 	if(evobase == NULL) goto err2;
 	if(PSequenceType.tp_doc == NULL)
-		PSequenceType.tp_doc = PObj_getDoc("PSequenceEvolverBase", module);
+		PSequenceType.tp_doc = PObj_getDoc("PSequenceEvolver", module);
 	if(PSequenceType.tp_doc == NULL) goto err1;
 
 	for(struct PyMethodDef* methdef = PSequenceEvolverType.tp_methods;

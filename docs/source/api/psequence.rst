@@ -5,12 +5,12 @@ PSequence
 
 .. autofunction:: pyrsistent_extras._psequence.sq
 
-.. autoclass:: pyrsistent_extras._psequence._python.PSequence()
+.. autoclass:: pyrsistent_extras._psequence._base.PSequence()
 	:members:
 	:inherited-members:
 	:special-members:
 
-.. autoclass:: pyrsistent_extras._psequence._python.Evolver()
+.. autoclass:: pyrsistent_extras._psequence._base.PSequenceEvolver()
 	:members:
 	:inherited-members:
 	:special-members:
