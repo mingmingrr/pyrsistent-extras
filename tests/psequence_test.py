@@ -15,16 +15,19 @@ import platform
 import datetime
 from lenses import lens
 
-hypothesis.settings.register_profile('pypy',
+hypothesis.settings.register_profile('coverage',
+	max_examples=2000,
+	deadline=datetime.timedelta(milliseconds=2500))
+
+hypothesis.settings.register_profile('fast',
 	max_examples=10,
 	deadline=datetime.timedelta(milliseconds=1000),
 	suppress_health_check=[hypothesis.HealthCheck.data_too_large])
 
 default_depth = 4
 
-if platform.python_implementation() == 'PyPy': # pragma: no cover
-	hypothesis.settings.load_profile('pypy')
-	default_depth = 3
+hypothesis.settings.load_profile(
+	os.getenv('HYPOTHESIS_PROFILE', 'default'))
 
 # {{{ strategies
 
@@ -286,14 +289,16 @@ def test_view(iseqitems:IndexSeq):
 		if m1 != m2:
 			if m1 > m2: n1, n2, m1, m2 = n2, n1, m2, m1
 			left, item1, mid, item2, right = seq.view(n1, n2)
+			with pytest.raises(IndexError):
+				seq.view(n2, n1)
 			assert check_seq(left) == items[:m1]
 			assert item1 == items[m1]
 			assert check_seq(mid) == items[m1+1:m2]
 			assert item2 == items[m2]
 			assert check_seq(right) == items[m2+1:]
-	else:
+	if not (-len(items) <= n1 < len(items)):
 		with pytest.raises(IndexError):
-			seq.view(0)
+			seq.view(n1)
 
 @given(psequences())
 @check_garbage
