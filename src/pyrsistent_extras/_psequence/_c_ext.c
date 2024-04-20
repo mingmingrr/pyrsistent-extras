@@ -226,8 +226,8 @@ static size_t FTree_size(const FTree* tree) {
 		case FEmptyT:  return 0;
 		case FSingleT: return tree->single->size;
 		case FDeepT:   return tree->deep->size;
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static Py_ssize_t FTree_ssize(const FTree* tree) {
@@ -307,8 +307,8 @@ UNUSED static void FTree_print(FTree* tree, int indent) {
 			FTree_print(tree->deep->middle, indent + 1);
 			FDigit_print(tree->deep->right, indent + 1);
 			break;
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 UNUSED static void FIter_print(FIter* iter) {
@@ -317,7 +317,7 @@ UNUSED static void FIter_print(FIter* iter) {
 			case FTreeI: printf("Tree"); break;
 			case FNodeI: printf("Node"); break;
 			case FDigitI: printf("Digit"); break;
-			default: assert(false);
+			default: assert(false); // LCOV_EXCL_LINE
 		}
 		printf("%d ", iter->index);
 		iter = iter->next;
@@ -473,7 +473,7 @@ static FIter* FIter_decRef(FIter* iter) {
 		case FTreeI: FTree_decRef(iter->tree); break;
 		case FDigitI: FDigit_decRef(iter->digit); break;
 		case FNodeI: FNode_decRef(iter->node); break;
-		default: assert(false);
+		default: assert(false); // LCOV_EXCL_LINE
 	}
 	return iter;
 }
@@ -524,8 +524,8 @@ static FNode* FNode_makeNS(const int count, FNode** nodes) {
 		case 3: return FNode_make(
 			nodes[0]->size + nodes[1]->size + nodes[2]->size,
 			nodes[0], nodes[1], nodes[2]);
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static FNode* FNode_makeE(const PyObject* item) {
@@ -576,8 +576,8 @@ static FDigit* FDigit_makeN(
 			count, nodes[0], nodes[1], nodes[2], NULL);
 		case 4: return FDigit_make(size,
 			count, nodes[0], nodes[1], nodes[2], nodes[3]);
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static FDigit* FDigit_makeS(
@@ -600,7 +600,7 @@ static FDigit* FDigit_makeS(
 		case 3: assert(n2 != NULL); size += n2->size;
 		case 2: assert(n1 != NULL); size += n1->size;
 		case 1: break;
-		default: assert(false);
+		default: assert(false); // LCOV_EXCL_LINE
 	}
 	digit->size = size;
 	return digit;
@@ -614,7 +614,7 @@ static FDigit* FDigit_makeNS(const int count, FNode** nodes) {
 		case 3: assert(nodes[2] != NULL); size += nodes[2]->size;
 		case 2: assert(nodes[1] != NULL); size += nodes[1]->size;
 		case 1: break;
-		default: assert(false);
+		default: assert(false); // LCOV_EXCL_LINE
 	}
 	return FDigit_makeN(size, count, nodes);
 }
@@ -713,8 +713,8 @@ static FTree* FTree_fromDigit(const FDigit* digit) {
 			FDigit_make(digit->items[2]->size + digit->items[3]->size, 2,
 				FNode_incRef(digit->items[2]),
 				FNode_incRef(digit->items[3]), NULL, NULL));
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static FTree* FTree_fromMerge(FMerge merge) {
@@ -914,8 +914,8 @@ static PyObject* FDigit_toTree(const FDigit* digit) {
 				FNode_toTree(digit->items[1]),
 				FNode_toTree(digit->items[2]),
 				FNode_toTree(digit->items[3]));
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PyObject* FTree_toTree(const FTree* tree) {
@@ -930,8 +930,8 @@ static PyObject* FTree_toTree(const FTree* tree) {
 			FDigit_toTree(tree->deep->left),
 			FTree_toTree(tree->deep->middle),
 			FDigit_toTree(tree->deep->right));
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PyObject* PSequence_toTree(PSequence* self) {
@@ -1044,8 +1044,8 @@ static FDigit* FDigit_appendLeft(FDigit* digit, FNode* node) {
 			FNode_incRef(digit->items[1]), NULL);
 		case 1: return FDigit_make(digit->size + node->size, 2, node,
 			FNode_incRef(digit->items[0]), NULL, NULL);
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static FTree* FTree_appendLeft(FTree* tree, FNode* node) {
@@ -1073,8 +1073,8 @@ static FTree* FTree_appendLeft(FTree* tree, FNode* node) {
 					FNode_incRef(tree->deep->left->items[2]),
 					FNode_incRef(tree->deep->left->items[3]))),
 				FDigit_incRef(tree->deep->right));
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PSequence* PSequence_appendLeft(PSequence* self, PyObject* value) {
@@ -1101,8 +1101,8 @@ static FDigit* FDigit_appendRight(FDigit* digit, FNode* node) {
 		case 1: return FDigit_make(digit->size + node->size, 2,
 			FNode_incRef(digit->items[0]),
 			node, NULL, NULL);
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static FTree* FTree_appendRight(FTree* tree, FNode* node) {
@@ -1131,8 +1131,8 @@ static FTree* FTree_appendRight(FTree* tree, FNode* node) {
 				FDigit_make(tree->deep->right->items[3]->size + node->size,
 					2, FNode_incRef(tree->deep->right->items[3]),
 					node, NULL, NULL));
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PSequence* PSequence_appendRight(PSequence* self, PyObject* value) {
@@ -1175,8 +1175,8 @@ static FView FTree_viewLeft(FTree* tree) {
 				FDigit_incRef(tree->deep->right));
 			return FView_make(head, tail);
 		}
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PyObject* PSequence_viewLeft(PSequence* self) {
@@ -1222,8 +1222,8 @@ static FView FTree_viewRight(FTree* tree) {
 					right->count - 1, right->items));
 			return FView_make(last, init);
 		}
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PyObject* PSequence_viewRight(PSequence* self) {
@@ -1249,8 +1249,8 @@ static PyObject* FTree_peekLeft(FTree* tree) {
 		case FDeepT:
 			assert(tree->deep->left->items[0]->size == 1);
 			return PObj_IncRef(tree->deep->left->items[0]->value);
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PyObject* PSequence_peekLeft(PSequence* self, void* UNUSED _ignore) {
@@ -1269,8 +1269,8 @@ static PyObject* FTree_peekRight(FTree* tree) {
 			assert(right->items[right->count - 1]->size == 1);
 			return PObj_IncRef(right->items[right->count - 1]->value);
 		}
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PyObject* PSequence_peekRight(PSequence* self, void* UNUSED _ignore) {
@@ -1322,7 +1322,7 @@ static FTree* FTree_fromNodes(size_t size, size_t count, FNode** nodes) {
 			x = *input++; y = *input++;
 			*output++ = FNode_makeS(x, y, NULL);
 			break;
-		default: assert(false);
+		default: assert(false); // LCOV_EXCL_LINE
 	}
 	size_t sizeN = size - left->size - right->size;
 	FTree* tree = FDeep_make(size, left,
@@ -1384,8 +1384,8 @@ static size_t FTree_toTuple(FTree* tree, PyObject* tuple, size_t index) {
 			index = FDigit_toTuple(tree->deep->left, tuple, index);
 			index = FTree_toTuple(tree->deep->middle, tuple, index);
 			return FDigit_toTuple(tree->deep->right, tuple, index);
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PyObject* PSequence_toTuple(PSequence* self) {
@@ -1431,8 +1431,8 @@ static size_t FTree_toList(FTree* tree, PyObject* list, size_t index) {
 			index = FDigit_toList(tree->deep->left, list, index);
 			index = FTree_toList(tree->deep->middle, list, index);
 			return FDigit_toList(tree->deep->right, list, index);
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PyObject* PSequence_toList(PSequence* self) {
@@ -1472,7 +1472,7 @@ static void* FDigit_getItem(const FDigit* digit, size_t index) {
 			return FNode_getItem(digit->items[i], index);
 		else
 			index -= size;
-	assert(false);
+	assert(false); // LCOV_EXCL_LINE
 }
 
 static void* FTree_getItem(const FTree* tree, size_t index) {
@@ -1488,8 +1488,8 @@ static void* FTree_getItem(const FTree* tree, size_t index) {
 				return FTree_getItem(tree->deep->middle, index);
 			index -= size;
 			return FDigit_getItem(tree->deep->right, index);
-		} default: assert(false);
-	}
+		} default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PyObject* PSequence_getItem(const PSequence* self, Py_ssize_t index) {
@@ -1544,8 +1544,8 @@ static int FTree_traverse(FTree* tree, visitproc visit, void* arg) {
 			if(ret != 0) return ret;
 			return FDigit_traverse(tree->deep->right, visit, arg);
 		}
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static int PSequence_traverse(PSequence* self, visitproc visit, void* arg) {
@@ -1588,7 +1588,7 @@ static FTree* FDeep_extend(FDeep* xs, FDeep* ys) {
 			right = FTree_decRefRet(right, FTree_appendLeft(right,
 				FNode_makeS(mid[0], mid[1], NULL)));
 		break;
-		default: assert(false);
+		default: assert(false); // LCOV_EXCL_LINE
 	}
 	return FTree_decRefRet(right, FDeep_make(size,
 		FDigit_incRef(xs->left),
@@ -1604,10 +1604,10 @@ static FTree* FTree_extend(FTree* xs, FTree* ys) {
 			case FEmptyT: return FTree_incRef(xs);
 			case FSingleT: return FTree_appendRight(xs, FNode_incRef(ys->single));
 			case FDeepT: return FDeep_extend(xs->deep, ys->deep);
-			default: assert(false);
+			default: assert(false); // LCOV_EXCL_LINE
 		}
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PSequence* PSequence_extendRight(PSequence* self, PyObject* arg) {
@@ -1691,7 +1691,7 @@ static FDigit* FDigit_setItem(
 			return FDigit_make(digit->size, digit->count,
 				nodes[0], nodes[1], nodes[2], nodes[3]);
 		} else index -= size;
-	assert(false);
+	assert(false); // LCOV_EXCL_LINE
 }
 
 static FTree* FTree_setItem(
@@ -1721,8 +1721,8 @@ static FTree* FTree_setItem(
 				FDigit_incRef(tree->deep->left),
 				FTree_incRef(tree->deep->middle),
 				FDigit_setItem(tree->deep->right, index, value));
-		} default: assert(false);
-	}
+		} default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PSequence* PSequence_setItem(
@@ -1813,8 +1813,8 @@ static FTree* FTree_msetItem(FTree* tree, FMset* mset) {
 			FDigit* right = FDigit_msetItem(tree->deep->right, mset);
 			return FDeep_make(tree->deep->size, left, middle, right);
 		}
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PSequence* PSequence_msetItemN(PSequence* self, PyObject* args) {
@@ -2030,8 +2030,8 @@ static FTree* FTree_insertItem(FTree* tree, size_t index, PyObject* item) {
 					FDigit_incRef(tree->deep->left), middle, ins.digit);
 			}
 		}
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PSequence* PSequence_insertItemN(PSequence* self, PyObject* args) {
@@ -2324,8 +2324,8 @@ static FMeld FTree_deleteItem(FTree* tree, size_t index) {
 			assert(index < tree->deep->right->size);
 			return FTree_deleteItemRight(tree, index);
 		}
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PSequence* PSequence_deleteItem(PSequence* self, Py_ssize_t index) {
@@ -2380,8 +2380,8 @@ static int FTree_contains(FTree* tree, PyObject* arg) {
 			if((comp = FDigit_contains(tree->deep->left, arg)) != 0) return comp;
 			if((comp = FDigit_contains(tree->deep->right, arg)) != 0) return comp;
 			return FTree_contains(tree->deep->middle, arg);
-		} default: assert(false);
-	}
+		} default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static int PSequence_contains(PSequence* self, PyObject* arg) {
@@ -2436,8 +2436,8 @@ static Py_ssize_t FTree_indexItem(FTree* tree, PyObject* arg) {
 			check_and_return(FDigit_indexItem(tree->deep->right, arg),
 				tree->deep->left->size + FTree_size(tree->deep->middle));
 			return 0;
-		} default: assert(false);
-	}
+		} default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 #undef check_and_return
@@ -2514,8 +2514,8 @@ static Py_ssize_t FTree_countItem(FTree* tree, PyObject* arg) {
 			total += comp;
 			if((comp = FDigit_countItem(tree->deep->right, arg)) < 0) return comp;
 			return total + comp;
-		} default: assert(false);
-	}
+		} default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PyObject* PSequence_countItem(PSequence* self, PyObject* arg) {
@@ -2544,7 +2544,7 @@ static FSplit FDeep_splitViewLeft(FDeep* deep, size_t index) {
 					FDigit_makeN(deep->left->size - dsize - size,
 						deep->left->count - i - 1, deep->left->items + i + 1),
 					FTree_incRef(deep->middle), FDigit_incRef(deep->right)));
-	assert(false);
+	assert(false); // LCOV_EXCL_LINE
 }
 
 static FSplit FDeep_splitViewRight(FDeep* deep, size_t index) {
@@ -2562,7 +2562,7 @@ static FSplit FDeep_splitViewRight(FDeep* deep, size_t index) {
 			FNode_decRefRet(deep->right->items[i], deep->right->items[i]),
 			FTree_fromNodes(deep->right->size - dsize - size,
 				deep->right->count - i - 1, deep->right->items + i + 1));
-	assert(false);
+	assert(false); // LCOV_EXCL_LINE
 }
 
 static FSplit FDeep_splitViewMiddle(FDeep* deep, size_t index) {
@@ -2626,8 +2626,8 @@ static FSplit FTree_splitView(FTree* tree, size_t index) {
 				return FDeep_splitViewMiddle(tree->deep, index);
 			index -= size;
 			return FDeep_splitViewRight(tree->deep, index);
-		} default: assert(false);
-	}
+		} default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 // splitAt has to split nodes anyway, so just reuse splitView
@@ -2732,7 +2732,7 @@ static FView FDeep_takeLeftLeft(FDeep* deep, size_t index) {
 			index -= size; dsize += size;
 		} else return FView_make(deep->left->items[i],
 			FTree_fromNodes(dsize, i, deep->left->items));
-	assert(false);
+	assert(false); // LCOV_EXCL_LINE
 }
 
 static FView FDeep_takeLeftRight(FDeep* deep, size_t index) {
@@ -2747,7 +2747,7 @@ static FView FDeep_takeLeftRight(FDeep* deep, size_t index) {
 				: FDeep_make(deep->size - deep->right->size + dsize,
 					FDigit_incRef(deep->left), FTree_incRef(deep->middle),
 					FDigit_makeN(dsize, i, deep->right->items)));
-	assert(false);
+	assert(false); // LCOV_EXCL_LINE
 }
 
 static FView FDeep_takeLeftMiddle(FDeep* deep, size_t index) {
@@ -2789,8 +2789,8 @@ static FView FTree_takeLeft(FTree* tree, size_t index) {
 				return FDeep_takeLeftMiddle(tree->deep, index);
 			index -= size;
 			return FDeep_takeLeftRight(tree->deep, index);
-		} default: assert(false);
-	}
+		} default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PSequence* PSequence_takeLeft(PSequence* self, Py_ssize_t index) {
@@ -2820,7 +2820,7 @@ static FView FDeep_takeRightLeft(FDeep* deep, size_t index) {
 					FDigit_makeN(dsize, deep->left->count - i - 1,
 						deep->left->items + i + 1),
 					FTree_incRef(deep->middle), FDigit_incRef(deep->right)));
-	assert(false);
+	assert(false); // LCOV_EXCL_LINE
 }
 
 static FView FDeep_takeRightRight(FDeep* deep, size_t index) {
@@ -2832,7 +2832,7 @@ static FView FDeep_takeRightRight(FDeep* deep, size_t index) {
 		} else return FView_make(deep->right->items[i],
 			FTree_fromNodes(dsize, deep->right->count - i - 1,
 				deep->right->items + i + 1));
-	assert(false);
+	assert(false); // LCOV_EXCL_LINE
 }
 
 static FView FDeep_takeRightMiddle(FDeep* deep, size_t index) {
@@ -2880,8 +2880,8 @@ static FView FTree_takeRight(FTree* tree, size_t index) {
 				return FDeep_takeRightMiddle(tree->deep, index);
 			index -= size;
 			return FDeep_takeRightLeft(tree->deep, index);
-		} default: assert(false);
-	}
+		} default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PSequence* PSequence_takeRight(PSequence* self, Py_ssize_t index) {
@@ -2917,13 +2917,13 @@ static PyObject* PObj_compare(PyObject* x, PyObject* y, int op) {
 				return PObj_IncRef(Py_True);
 			case Py_NE: case Py_GT: case Py_LT:
 				return PObj_IncRef(Py_False);
-			default: assert(false);
+			default: assert(false); // LCOV_EXCL_LINE
 		} else switch(op) {
 			case Py_NE: case Py_LT: case Py_LE:
 				return PObj_IncRef(Py_True);
 			case Py_EQ: case Py_GT: case Py_GE:
 				return PObj_IncRef(Py_False);
-			default: assert(false);
+			default: assert(false); // LCOV_EXCL_LINE
 		}
 	}
 	if(y == NULL) switch(op) {
@@ -2931,7 +2931,7 @@ static PyObject* PObj_compare(PyObject* x, PyObject* y, int op) {
 			return PObj_IncRef(Py_True);
 		case Py_EQ: case Py_LT: case Py_LE:
 			return PObj_IncRef(Py_False);
-		default: assert(false);
+		default: assert(false); // LCOV_EXCL_LINE
 	}
 	int eq = PyObject_RichCompareBool(x, y, Py_EQ);
 	if(eq != 0) return NULL;
@@ -2947,7 +2947,7 @@ static PyObject* PObj_compare(PyObject* x, PyObject* y, int op) {
 		case Py_LT: case Py_LE:
 			return PObj_IncRef(gt == 0 ? Py_True : Py_False);
 	}
-	assert(false);
+	assert(false); // LCOV_EXCL_LINE
 }
 
 static PyObject* PIter_compare(PyObject* xs, PyObject* ys, int op) {
@@ -2971,7 +2971,7 @@ static PyObject* PSequence_compare(PyObject* xs, PyObject* ys, int op) {
 			return PObj_IncRef(Py_True);
 		case Py_NE: case Py_LT: case Py_GT:
 			return PObj_IncRef(Py_False);
-		default: assert(false);
+		default: assert(false); // LCOV_EXCL_LINE
 	}
 	PyObject* xi = PyObject_GetIter(xs);
 	if(xi == NULL) return NULL;
@@ -3035,8 +3035,8 @@ static Py_uhash_t FTree_hash(FTree* tree, Py_uhash_t acc) {
 			if((acc = FTree_hash(tree->deep->middle, acc)) == (Py_uhash_t)-1) return -1;
 			return FDigit_hash(tree->deep->right, acc);
 		}
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static Py_hash_t PSequence_hash(PSequence* self) {
@@ -3079,8 +3079,8 @@ static FDigit* FDigit_reverse(FDigit* digit) {
 			FNode_reverse(digit->items[2]),
 			FNode_reverse(digit->items[1]),
 			FNode_reverse(digit->items[0]));
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static FTree* FTree_reverse(FTree* tree) {
@@ -3092,8 +3092,8 @@ static FTree* FTree_reverse(FTree* tree) {
 			FDigit_reverse(tree->deep->right),
 			FTree_reverse(tree->deep->middle),
 			FDigit_reverse(tree->deep->left));
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PSequence* PSequence_reverse(PSequence* self) {
@@ -3149,8 +3149,8 @@ static bool FTree_getSlice(FTree* tree, FSlice* slice) {
 			if(FTree_getSlice(tree->deep->middle, slice))
 				return true;
 			return FDigit_getSlice(tree->deep->right, slice);
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PSequence* PSequence_getSlice(PSequence* self, PyObject* slice) {
@@ -3325,8 +3325,8 @@ static FTree* FTree_setSlice(FTree* tree, FSlice* slice) {
 			FDigit* right = FDigit_setSlice(tree->deep->right, slice);
 			return FDeep_make(tree->deep->size, left, middle, right);
 		}
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PSequence* PSequence_setSlice(
@@ -3653,9 +3653,9 @@ static FIter* FIter_nextStack(FIter* iter) {
 							iter, FTreeI, 0, iter->tree->deep->middle));
 						case 2: return FIter_nextStack(FIter_swapStack(
 							iter, FDigitI, 0, iter->tree->deep->right));
-						default: assert(false);
+						default: assert(false); // LCOV_EXCL_LINE
 					}
-				default: assert(false);
+				default: assert(false); // LCOV_EXCL_LINE
 			};
 		case FDigitI: {
 			assert(0 <= iter->index && iter->index <= 4);
@@ -3676,8 +3676,8 @@ static FIter* FIter_nextStack(FIter* iter) {
 				return FIter_nextStack(FIter_swapStack(iter, FNodeI, 0, node));
 			return FIter_nextStack(FIter_pushStack(iter, FNodeI, 0, node));
 		}
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static FIter* FIter_prevStack(FIter* iter) {
@@ -3710,7 +3710,7 @@ static FIter* FIter_prevStack(FIter* iter) {
 									iter, FTreeI, 1, tree));
 								case FDeepT: return FIter_prevStack(FIter_pushStack(
 									iter, FTreeI, 3, tree));
-								default: assert(false);
+								default: assert(false); // LCOV_EXCL_LINE
 							}
 						}
 						case 3: {
@@ -3718,9 +3718,9 @@ static FIter* FIter_prevStack(FIter* iter) {
 							return FIter_prevStack(FIter_pushStack(
 								iter, FDigitI, digit->count, digit));
 						}
-						default: assert(false);
+						default: assert(false); // LCOV_EXCL_LINE
 					}
-				default: assert(false);
+				default: assert(false); // LCOV_EXCL_LINE
 			};
 		case FDigitI: {
 			assert(1 <= iter->index && iter->index <= 4);
@@ -3745,8 +3745,8 @@ static FIter* FIter_prevStack(FIter* iter) {
 			return FIter_prevStack(FIter_pushStack(
 				iter, FNodeI, FNode_count(node), node));
 		}
-		default: assert(false);
-	}
+		default: assert(false); // LCOV_EXCL_LINE
+	} // LCOV_EXCL_LINE
 }
 
 static PyObject* PSequenceIter_next(PSequenceIter* self) {
@@ -3790,7 +3790,7 @@ static PSequenceIter* PSequence_reversed(PSequence* self) {
 		case FEmptyT: index = 0; break;
 		case FSingleT: index = 1; break;
 		case FDeepT: index = 3; break;
-		default: assert(false);
+		default: assert(false); // LCOV_EXCL_LINE
 	}
 	return PSequenceIter_make(
 		FTree_size(self->tree), true, PObj_IncRef(self),
