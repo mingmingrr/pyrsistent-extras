@@ -411,7 +411,7 @@ static void FDigit_decRef(FDigit* digit) {
 			case 2: FNode_decRef(digit->items[1]);
 			case 1: FNode_decRef(digit->items[0]);
 				break;
-			default: assert(false);
+			default: assert(false); // LCOV_EXCL_LINE
 		}
 		PyMem_Free(digit);
 	}
@@ -447,7 +447,7 @@ static void FTree_decRef(FTree* tree) {
 				FDigit_decRef(tree->deep->right);
 				PyMem_Free(tree->deep);
 				break;
-			default: assert(false);
+			default: assert(false); // LCOV_EXCL_LINE
 		}
 		PyMem_Free(tree);
 	}
@@ -463,7 +463,7 @@ static FIter* FIter_incRef(FIter* iter) {
 		case FTreeI: FTree_incRef(iter->tree); break;
 		case FDigitI: FDigit_incRef(iter->digit); break;
 		case FNodeI: FNode_incRef(iter->node); break;
-		default: assert(false);
+		default: assert(false); // LCOV_EXCL_LINE
 	}
 	return iter;
 }
