@@ -96,10 +96,10 @@ python =
 [testenv]
 pass_env =
 	PYTEST_ADDOPTS
+	HYPOTHESIS_PROFILE
 	NIX_LD
 	NIX_LD_LIBRARY_PATH
 commands =
-	{envpython} -m pytest {toxinidir}/tests
+	{envpython} -m pytest {env_site_packages_dir}/pyrsistent_extras {toxinidir}/tests
 extras = test
-change_dir = {toxinidir}/build/tox_{envname}
 """
