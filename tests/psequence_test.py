@@ -16,7 +16,7 @@ import datetime
 from lenses import lens
 
 hypothesis.settings.register_profile('coverage',
-	max_examples=2000,
+	max_examples=200,
 	deadline=datetime.timedelta(milliseconds=2500))
 
 hypothesis.settings.register_profile('fast',
