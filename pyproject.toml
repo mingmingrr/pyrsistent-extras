@@ -42,6 +42,11 @@ docs = [
 	"sphinx",
 	"sphinx_rtd_theme",
 ]
+coverage = [
+	"coverage",
+	"coveralls",
+	"cpp-coveralls",
+]
 
 [project.urls]
 Homepage = "https://github.com/mingmingrr/pyrsistent-extras"
