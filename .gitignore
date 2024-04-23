@@ -4,6 +4,8 @@
 *.so
 *.egg-info
 __pycache__
-build
-benchmark
-dist
+/build
+/docs/build
+/benchmark
+/dist
+/coveralls.json
