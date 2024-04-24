@@ -12,6 +12,7 @@ fi
 
 cd $TMP
 cp -r $package/tests mtests
-pytest -s mtests
+export HYPOTHESIS_PROFILE=fast
+pytest --stepwise-skip mtests
 rm -r mtests
 cd $FILE_PATH

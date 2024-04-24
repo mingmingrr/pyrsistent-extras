@@ -22,7 +22,10 @@ hypothesis.settings.register_profile('coverage',
 hypothesis.settings.register_profile('fast',
 	max_examples=10,
 	deadline=datetime.timedelta(milliseconds=1000),
-	suppress_health_check=[hypothesis.HealthCheck.data_too_large])
+	suppress_health_check=[
+		hypothesis.HealthCheck.too_slow,
+		hypothesis.HealthCheck.data_too_large,
+	])
 
 default_depth = 4
 

@@ -10,76 +10,65 @@ on:
 
 jobs:
   build_wheels:
-    name: Build ${{ matrix.python }} wheels on ${{ matrix.os }}-${{ matrix.platform_id }}
-    runs-on: ${{ matrix.os }}
+    name: Build ${{ matrix.python }} wheels on ${{ matrix.platform.os }}-${{ matrix.platform_id }}
+    runs-on: ${{ matrix.platform.os }}
     strategy:
       # Ensure the wheels build even if one fails.
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
         python: [38, 39, 310, 311, 312]
-        bitness: [32, 64]
-        include:
-          # Run 32 and 64 bit version in parallel for Linux and Windows
-          - os: windows-latest
-            bitness: 64
-            platform_id: win_amd64
-          - os: windows-latest
-            bitness: 32
-            platform_id: win32
-          - os: ubuntu-latest
-            bitness: 64
-            platform_id: manylinux_x86_64
-          - os: ubuntu-latest
-            bitness: 32
-            platform_id: manylinux_i686
-          - os: macos-latest
-            bitness: 64
-            platform_id: macosx_x86_64
-          - os: macos-latest
-            bitness: 64
-            platform_id: macosx_universal2
-          # Python 3.7 does not have universal2 wheel support yet
-          - os: macos-latest
-            python: 37
-            platform_id: macosx_x86_64
-          # Python 3.8 and onwards only need universal2 wheels
-          - os: macos-latest
-            python: 38
-            platform_id: macosx_universal2
-          - os: macos-latest
-            python: 39
-            platform_id: macosx_universal2
-          - os: macos-latest
-            python: 310
-            platform_id: macosx_universal2
-        exclude:
-          - os: macos-latest
-            bitness: 32
+        platform:
+          - id: win_amd64
+            os: windows-latest
+            qemu: false
+          - id: win32
+            os: windows-latest
+            qemu: false
+          - id: manylinux_x86_64
+            os: ubuntu-latest
+            qemu: false
+          - id: manylinux_i686
+            os: ubuntu-latest
+            qemu: true
+          - id: manylinux_aarch64
+            os: ubuntu-latest
+            qemu: true
+          - id: macosx_universal2
+            os: macos-latest
+            qemu: false
     env:
-      CIBW_ARCHS_MACOS: x86_64 universal2
-      CIBW_BUILD: cp${{ matrix.python }}-${{ matrix.platform_id }}
-      CIBW_TEST_REQUIRES: pytest==6.* hypothesis==6.*
+      CIBW_ARCHS_LINUX: auto aarch64
+      CIBW_ARCHS_MACOS: universal2
+      CIBW_BUILD: cp${{ matrix.python }}-${{ matrix.platform.id }}
+      CIBW_TEST_REQUIRES: pyrsistent lenses pytest==6.* hypothesis==6.*
       CIBW_TEST_COMMAND: "bash {project}/tools/test_wheels.sh {project}"
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
       CIBW_MANYLINUX_I686_IMAGE: manylinux2014
+      CIBW_MANYLINUX_AARCH64_IMAGE: manylinux2014
+
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        if: matrix.platform.qemu
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: all
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.3.1
+        uses: pypa/cibuildwheel@v2.17.0
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           path: ./wheelhouse/*.whl
 
   build_dist:
-    name: Build source distribution and pure python wheel
+    name: Build source distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v5
         name: Install Python
         with:
           python-version: '3.10'
@@ -92,12 +81,7 @@ jobs:
       - name: Build sdist
         run: python -m build --sdist
 
-      - name: Build pure wheel
-        run: python -m build --wheel
-        env:
-          PYRSISTENT_SKIP_EXTENSION: yes
-
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           path: dist/*
 
@@ -111,14 +95,14 @@ jobs:
     # if: github.event_name == 'release' && github.event.action == 'published'
 
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: artifact
           path: dist
 
       - name: Publish test release
         if: github.event.inputs.target == 'test'
-        uses: pypa/gh-action-pypi-publish@v1.4.2
+        uses: pypa/gh-action-pypi-publish@v1.5.1
         with:
           user: __token__
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
@@ -127,7 +111,7 @@ jobs:
 
       - name: Publish release
         if: github.event.inputs.target != 'test'
-        uses: pypa/gh-action-pypi-publish@v1.4.2
+        uses: pypa/gh-action-pypi-publish@v1.5.1
         with:
          user: __token__
          password: ${{ secrets.PYPI_API_TOKEN }}
