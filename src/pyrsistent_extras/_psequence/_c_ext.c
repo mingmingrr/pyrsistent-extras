@@ -94,6 +94,8 @@ int FIndex2_compare(const FIndex2* x, const FIndex2* y) {
 // {{{ print
 // for debugging tree structures
 
+// LCOV_EXCL_START
+
 UNUSED void FIndent_print(int indent) {
 	// printf("%d ", indent);
 	for(int i = 0; i < indent; ++i)
@@ -158,9 +160,13 @@ UNUSED void FIter_print(FIter* iter) {
 	printf("(nil)\n");
 }
 
+// LCOV_EXCL_STOP
+
 // }}}
 
 // {{{ debug
+
+// LCOV_EXCL_START
 
 #ifndef NDEBUG
 long FRefs_count[3];
@@ -172,6 +178,8 @@ inline long FRefs_get(FRefs type) { return 0; }
 inline void FRefs_inc(FRefs type) { }
 inline void FRefs_dec(FRefs type) { }
 #endif
+
+// LCOV_EXCL_STOP
 
 // }}}
 
