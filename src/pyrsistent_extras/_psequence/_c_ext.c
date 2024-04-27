@@ -1,12 +1,7 @@
 // #define PYMALLOC_DEBUG 1
 
-#define PY_SSIZE_T_CLEAN
-#include <Python.h>
-#include <structmember.h>
+#include "_c_ext.h"
 
-#include <stdarg.h>
-#include <stdbool.h>
-#include <assert.h>
 
 /*
 Persistent/Immutable/Functional sequence and helper types.
@@ -25,183 +20,23 @@ pyrsistent_* - Methods part of the interface
 F<typename>  - FingerTree related types, considered private
 P<typename>  - PSequence related types, considered public
 
-All other methods are camel cased without prefix. All methods are static,
-none should require to be exposed outside of this module.
+All other methods are camel cased without prefix.
 */
-
-// {{{ typedef
-
-typedef struct FNode {
-	size_t refs;
-	size_t size;
-	union {
-		PyObject* value;
-		struct FNode* items[3];
-	};
-} FNode;
-
-typedef struct FDigit {
-	size_t refs;
-	size_t size;
-	int  count;
-	FNode* items[4];
-} FDigit;
-
-typedef struct FTree FTree;
-
-typedef struct FDeep {
-	size_t size;
-	FDigit* left;
-	FTree* middle;
-	FDigit* right;
-} FDeep;
-
-typedef enum FTreeT {
-	FEmptyT  = 0,
-	FSingleT = 1,
-	FDeepT   = 2
-} FTreeT ;
-
-typedef struct FTree {
-	size_t refs;
-	FTreeT type;
-	union {
-		void* empty;
-		FNode* single;
-		FDeep* deep;
-	};
-} FTree;
-
-typedef struct FView {
-	FNode* node;
-	FTree* tree;
-} FView;
-
-typedef struct FSplit {
-	FTree* left;
-	FNode* node;
-	FTree* right;
-} FSplit;
-
-typedef struct FIndex {
-	size_t index;
-	union {
-		FNode* node;
-		PyObject* value;
-	};
-} FIndex;
-
-typedef struct FIndex2 {
-	size_t index1;
-	size_t index2;
-	union {
-		FNode* node;
-		PyObject* value;
-	};
-} FIndex2;
-
-typedef struct FInsert {
-	FNode* extra;
-	union {
-		FNode* node;
-		FDigit* digit;
-	};
-} FInsert;
-
-typedef struct FMeld {
-	bool full;
-	union {
-		FNode* node;
-		FDigit* digit;
-		FTree* tree;
-	};
-} FMeld;
-
-typedef struct FMerge {
-	union {
-		FNode* left;
-		FNode* node;
-	};
-	union {
-		FNode* right;
-		void* extra;
-	};
-} FMerge;
-
-typedef enum FIterT {
-	FTreeI  = 0,
-	FDigitI = 1,
-	FNodeI  = 2
-} FIterT;
-
-typedef struct FIter {
-	FIterT type;
-	int index;
-	union {
-		FTree* tree;
-		FNode* node;
-		FDigit* digit;
-	};
-	struct FIter* next;
-} FIter;
-
-typedef struct FMset {
-	size_t index;
-	size_t count;
-	FIndex2* items;
-} FMset;
-
-typedef struct FSlice {
-	size_t modulo;
-	size_t count;
-	size_t step;
-	union {
-		PyObject** input;
-		FNode** output;
-	};
-} FSlice;
-
-typedef struct PSequence {
-	PyObject_HEAD
-	FTree* tree;
-	PyObject* weakrefs;
-} PSequence;
-
-typedef struct PSequenceIter {
-	PyObject_HEAD
-	Py_ssize_t index;
-	bool reverse;
-	PSequence* seq;
-	FIter* stack;
-} PSequenceIter;
-
-typedef struct PSequenceEvolver {
-	PyObject_HEAD
-	PSequence* seq;
-} PSequenceEvolver;
-
-static PyTypeObject PSequenceType;
-static PyTypeObject PSequenceIterType;
-static PyTypeObject PSequenceEvolverType;
-
-// }}}
 
 // {{{ misc
 
-#if defined(__GNUC__) || defined(__clang__)
-# define UNUSED __attribute__((unused))
-#else
-# define UNUSED
-#endif
+PyTypeObject PSequenceType;
+PyTypeObject PSequenceIterType;
+PyTypeObject PSequenceEvolverType;
 
-static PSequence* EMPTY_SEQUENCE = NULL;
-static FTree EMPTY_TREE = { .refs = 1, .type = FEmptyT, .empty = NULL };
+PSequence* EMPTY_SEQUENCE = NULL;
+FTree EMPTY_TREE = { .refs = 1, .type = FEmptyT, .empty = NULL };
 
-static void* PSequence_indexError(Py_ssize_t index) {
+void* PSequence_indexError(Py_ssize_t index) {
 	return PyErr_Format(PyExc_IndexError, "index out of range: %zd", index);
 }
 
-static int FNode_count(const FNode* node) {
+int FNode_count(const FNode* node) {
 	if(node->size == 1)
 		return 1;
 	if(node->items[2] == NULL)
@@ -210,7 +45,7 @@ static int FNode_count(const FNode* node) {
 		return 3;
 }
 
-UNUSED static size_t FNode_depth(const FNode* node) {
+size_t FNode_depth(const FNode* node) {
 	assert(node != NULL);
 	size_t n = 0;
 	while(node->size != 1) {
@@ -221,7 +56,7 @@ UNUSED static size_t FNode_depth(const FNode* node) {
 	return n;
 }
 
-static size_t FTree_size(const FTree* tree) {
+size_t FTree_size(const FTree* tree) {
 	switch(tree->type) {
 		case FEmptyT:  return 0;
 		case FSingleT: return tree->single->size;
@@ -230,15 +65,15 @@ static size_t FTree_size(const FTree* tree) {
 	} // LCOV_EXCL_LINE
 }
 
-static Py_ssize_t FTree_ssize(const FTree* tree) {
+Py_ssize_t FTree_ssize(const FTree* tree) {
 	return (Py_ssize_t)FTree_size(tree);
 }
 
-static bool FTree_empty(const FTree* tree) {
+bool FTree_empty(const FTree* tree) {
 	return tree->type == FEmptyT;
 }
 
-static bool FTree_checkIndex(const FTree* tree, Py_ssize_t* index) {
+bool FTree_checkIndex(const FTree* tree, Py_ssize_t* index) {
 	Py_ssize_t size = FTree_size(tree);
 	Py_ssize_t idx = *index;
 	if(idx < 0) idx += size;
@@ -248,7 +83,7 @@ static bool FTree_checkIndex(const FTree* tree, Py_ssize_t* index) {
 	return true;
 }
 
-static int FIndex2_compare(const FIndex2* x, const FIndex2* y) {
+int FIndex2_compare(const FIndex2* x, const FIndex2* y) {
 	if(x->index1 == y->index1)
 		return x->index2 - y->index2;
 	return x->index1 - y->index1;
@@ -259,15 +94,13 @@ static int FIndex2_compare(const FIndex2* x, const FIndex2* y) {
 // {{{ print
 // for debugging tree structures
 
-#ifndef NDEBUG
-
-UNUSED static void FIndent_print(int indent) {
+UNUSED void FIndent_print(int indent) {
 	// printf("%d ", indent);
 	for(int i = 0; i < indent; ++i)
 		printf("  ");
 }
 
-UNUSED static void FNode_print(FNode* node, int indent) {
+UNUSED void FNode_print(FNode* node, int indent) {
 	FIndent_print(indent);
 	if(node->size == 1) {
 		printf("FElement(refs=%zu) ", node->refs);
@@ -283,14 +116,14 @@ UNUSED static void FNode_print(FNode* node, int indent) {
 	}
 }
 
-UNUSED static void FDigit_print(FDigit* digit, int indent) {
+UNUSED void FDigit_print(FDigit* digit, int indent) {
 	FIndent_print(indent);
 	printf("FDigit[size=%zu](refs=%zu)\n", digit->size, digit->refs);
 	for(int i = 0; i < digit->count; ++i)
 		FNode_print(digit->items[i], indent + 1);
 }
 
-UNUSED static void FTree_print(FTree* tree, int indent) {
+UNUSED void FTree_print(FTree* tree, int indent) {
 	FIndent_print(indent);
 	switch(tree->type) {
 		case FEmptyT:
@@ -311,7 +144,7 @@ UNUSED static void FTree_print(FTree* tree, int indent) {
 	} // LCOV_EXCL_LINE
 }
 
-UNUSED static void FIter_print(FIter* iter) {
+UNUSED void FIter_print(FIter* iter) {
 	while(iter != NULL) {
 		switch(iter->type) {
 			case FTreeI: printf("Tree"); break;
@@ -325,46 +158,38 @@ UNUSED static void FIter_print(FIter* iter) {
 	printf("(nil)\n");
 }
 
-#endif
-
 // }}}
 
 // {{{ debug
 
-typedef enum FRefs {
-	FTreeR = 0,
-	FDigitR = 1,
-	FNodeR = 2,
-} FRefs;
-
 #ifndef NDEBUG
-static long FRefs_count[3];
-static long FRefs_get(FRefs type) { return FRefs_count[type]; }
-static void FRefs_inc(FRefs type) { ++FRefs_count[type]; }
-static void FRefs_dec(FRefs type) { --FRefs_count[type]; }
+long FRefs_count[3];
+long FRefs_get(FRefs type) { return FRefs_count[type]; }
+void FRefs_inc(FRefs type) { ++FRefs_count[type]; }
+void FRefs_dec(FRefs type) { --FRefs_count[type]; }
 #else
-#define FRefs_get(type) 0
-#define FRefs_inc(type)
-#define FRefs_dec(type)
+inline long FRefs_get(FRefs type) { return 0; }
+inline void FRefs_inc(FRefs type) { }
+inline void FRefs_dec(FRefs type) { }
 #endif
 
 // }}}
 
 // {{{ ref count
 
-static void* PObj_IncRef(void* obj) {
+void* PObj_IncRef(void* obj) {
 	Py_INCREF(obj);
 	return obj;
 }
 
-static FNode* FNode_incRef(FNode* node) {
+FNode* FNode_incRef(FNode* node) {
 	assert(node != NULL);
 	++node->refs;
 	FRefs_inc(FNodeR);
 	return node;
 }
 
-static FNode* FNode_incRefM(FNode* node) {
+FNode* FNode_incRefM(FNode* node) {
 	if(node != NULL) {
 		++node->refs;
 		FRefs_inc(FNodeR);
@@ -372,7 +197,7 @@ static FNode* FNode_incRefM(FNode* node) {
 	return node;
 }
 
-static void FNode_decRef(FNode* node) {
+void FNode_decRef(FNode* node) {
 	assert(node != NULL);
 	assert(node->refs > 0);
 	FRefs_dec(FNodeR);
@@ -387,12 +212,12 @@ static void FNode_decRef(FNode* node) {
 	}
 }
 
-static void* FNode_decRefRet(FNode* node, void* ret) {
+void* FNode_decRefRet(FNode* node, void* ret) {
 	FNode_decRef(node);
 	return ret;
 }
 
-static FDigit* FDigit_incRef(FDigit* digit) {
+FDigit* FDigit_incRef(FDigit* digit) {
 	if(digit != NULL) {
 		++digit->refs;
 		FRefs_inc(FDigitR);
@@ -400,7 +225,7 @@ static FDigit* FDigit_incRef(FDigit* digit) {
 	return digit;
 }
 
-static void FDigit_decRef(FDigit* digit) {
+void FDigit_decRef(FDigit* digit) {
 	assert(digit != NULL);
 	assert(digit->refs > 0);
 	FRefs_dec(FDigitR);
@@ -417,12 +242,12 @@ static void FDigit_decRef(FDigit* digit) {
 	}
 }
 
-// static void* FDigit_decRefRet(FDigit* digit, void* ret) {
+// void* FDigit_decRefRet(FDigit* digit, void* ret) {
 	// FDigit_decRef(digit);
 	// return ret;
 // }
 
-static FTree* FTree_incRef(FTree* tree) {
+FTree* FTree_incRef(FTree* tree) {
 	if(tree != NULL) {
 		++tree->refs;
 		FRefs_inc(FTreeR);
@@ -430,7 +255,7 @@ static FTree* FTree_incRef(FTree* tree) {
 	return tree;
 }
 
-static void FTree_decRef(FTree* tree) {
+void FTree_decRef(FTree* tree) {
 	assert(tree != NULL);
 	assert(tree->refs > 0);
 	FRefs_dec(FTreeR);
@@ -453,12 +278,12 @@ static void FTree_decRef(FTree* tree) {
 	}
 }
 
-static void* FTree_decRefRet(FTree* tree, void* ret) {
+void* FTree_decRefRet(FTree* tree, void* ret) {
 	FTree_decRef(tree);
 	return ret;
 }
 
-static FIter* FIter_incRef(FIter* iter) {
+FIter* FIter_incRef(FIter* iter) {
 	switch(iter->type) {
 		case FTreeI: FTree_incRef(iter->tree); break;
 		case FDigitI: FDigit_incRef(iter->digit); break;
@@ -468,7 +293,7 @@ static FIter* FIter_incRef(FIter* iter) {
 	return iter;
 }
 
-static FIter* FIter_decRef(FIter* iter) {
+FIter* FIter_decRef(FIter* iter) {
 	switch(iter->type) {
 		case FTreeI: FTree_decRef(iter->tree); break;
 		case FDigitI: FDigit_decRef(iter->digit); break;
@@ -484,14 +309,14 @@ static FIter* FIter_decRef(FIter* iter) {
 
 // {{{ FNode
 
-static FNode* FNode_alloc() {
+FNode* FNode_alloc() {
 	FNode* node = (FNode*)PyMem_Malloc(sizeof(FNode));
 	node->refs = 1;
 	FRefs_inc(FNodeR);
 	return node;
 }
 
-static FNode* FNode_make(
+FNode* FNode_make(
 	const size_t size,
 	const FNode* n0,
 	const FNode* n1,
@@ -506,7 +331,7 @@ static FNode* FNode_make(
 	return node;
 }
 
-static FNode* FNode_makeS(
+FNode* FNode_makeS(
 	const FNode* n0,
 	const FNode* n1,
 	const FNode* n2
@@ -516,7 +341,7 @@ static FNode* FNode_makeS(
 	return FNode_make(size, n0, n1, n2);
 }
 
-static FNode* FNode_makeNS(const int count, FNode** nodes) {
+FNode* FNode_makeNS(const int count, FNode** nodes) {
 	switch(count) {
 		case 2: return FNode_make(
 			nodes[0]->size + nodes[1]->size,
@@ -528,7 +353,7 @@ static FNode* FNode_makeNS(const int count, FNode** nodes) {
 	} // LCOV_EXCL_LINE
 }
 
-static FNode* FNode_makeE(const PyObject* item) {
+FNode* FNode_makeE(const PyObject* item) {
 	return FNode_make(1, (FNode*)item, NULL, NULL);
 }
 
@@ -536,14 +361,14 @@ static FNode* FNode_makeE(const PyObject* item) {
 
 // {{{ FDigit
 
-static FDigit* FDigit_alloc() {
+FDigit* FDigit_alloc() {
 	FDigit* digit = (FDigit*)PyMem_Malloc(sizeof(FDigit));
 	digit->refs = 1;
 	FRefs_inc(FDigitR);
 	return digit;
 }
 
-static FDigit* FDigit_make(
+FDigit* FDigit_make(
 	const size_t size,
 	const int count,
 	const FNode* n0,
@@ -562,7 +387,7 @@ static FDigit* FDigit_make(
 	return digit;
 }
 
-static FDigit* FDigit_makeN(
+FDigit* FDigit_makeN(
 	const size_t size,
 	const int count,
 	FNode** nodes
@@ -580,7 +405,7 @@ static FDigit* FDigit_makeN(
 	} // LCOV_EXCL_LINE
 }
 
-static FDigit* FDigit_makeS(
+FDigit* FDigit_makeS(
 	const int count,
 	const FNode* n0,
 	const FNode* n1,
@@ -606,7 +431,7 @@ static FDigit* FDigit_makeS(
 	return digit;
 }
 
-static FDigit* FDigit_makeNS(const int count, FNode** nodes) {
+FDigit* FDigit_makeNS(const int count, FNode** nodes) {
 	assert(nodes[0] != NULL);
 	size_t size = nodes[0]->size;
 	switch(count) {
@@ -619,14 +444,14 @@ static FDigit* FDigit_makeNS(const int count, FNode** nodes) {
 	return FDigit_makeN(size, count, nodes);
 }
 
-static FDigit* FDigit_fromNode(const FNode* node) {
+FDigit* FDigit_fromNode(const FNode* node) {
 	return FDigit_make(node->size, FNode_count(node),
 		FNode_incRef(node->items[0]),
 		FNode_incRef(node->items[1]),
 		FNode_incRefM(node->items[2]), NULL);
 }
 
-static FDigit* FDigit_fromMerge(FMerge merge) {
+FDigit* FDigit_fromMerge(FMerge merge) {
 	if(merge.extra == NULL)
 		return FDigit_make(merge.left->size, 1,
 			merge.left, NULL, NULL, NULL);
@@ -638,31 +463,31 @@ static FDigit* FDigit_fromMerge(FMerge merge) {
 
 // {{{ FTree
 
-static FTree* FTree_alloc() {
+FTree* FTree_alloc() {
 	FTree* tree = (FTree*)PyMem_Malloc(sizeof(FTree));
 	tree->refs = 1;
 	FRefs_inc(FTreeR);
 	return tree;
 }
 
-static FTree* FEmpty_make() {
+FTree* FEmpty_make() {
 	FTree_incRef(&EMPTY_TREE);
 	return &EMPTY_TREE;
 }
 
-static FTree* FSingle_make(const FNode* node) {
+FTree* FSingle_make(const FNode* node) {
 	FTree* tree = FTree_alloc();
 	tree->type = FSingleT;
 	tree->single = (FNode*)node;
 	return tree;
 }
 
-static FDeep* FDeep_alloc() {
+FDeep* FDeep_alloc() {
 	FDeep* deep = (FDeep*)PyMem_Malloc(sizeof(FDeep));
 	return deep;
 }
 
-static FTree* FDeep_make(
+FTree* FDeep_make(
 	const size_t size,
 	const FDigit* left,
 	const FTree* middle,
@@ -680,7 +505,7 @@ static FTree* FDeep_make(
 	return tree;
 }
 
-static FTree* FDeep_makeS(
+FTree* FDeep_makeS(
 	const FDigit* left,
 	const FTree* middle,
 	const FDigit* right
@@ -689,7 +514,7 @@ static FTree* FDeep_makeS(
 	return FDeep_make(size, left, middle, right);
 }
 
-static FTree* FTree_fromDigit(const FDigit* digit) {
+FTree* FTree_fromDigit(const FDigit* digit) {
 	switch(digit->count) {
 		case 1: return FSingle_make(FNode_incRef(digit->items[0]));
 		case 2: return FDeep_make(digit->size,
@@ -717,7 +542,7 @@ static FTree* FTree_fromDigit(const FDigit* digit) {
 	} // LCOV_EXCL_LINE
 }
 
-static FTree* FTree_fromMerge(FMerge merge) {
+FTree* FTree_fromMerge(FMerge merge) {
 	if(merge.extra == NULL)
 		return FSingle_make(merge.left);
 	return FDeep_makeS(
@@ -730,7 +555,7 @@ static FTree* FTree_fromMerge(FMerge merge) {
 
 // {{{ PSequence
 
-static PSequence* PSequence_make(const FTree* tree) {
+PSequence* PSequence_make(const FTree* tree) {
 	assert(tree != NULL);
 	PSequence* seq = PyObject_GC_New(PSequence, &PSequenceType);
 	seq->tree = (FTree*)tree;
@@ -739,7 +564,7 @@ static PSequence* PSequence_make(const FTree* tree) {
 	return seq;
 }
 
-static void PSequence_dealloc(PSequence* self) {
+void PSequence_dealloc(PSequence* self) {
 	if (self->weakrefs != NULL)
 		PyObject_ClearWeakRefs((PyObject*)self);
 	PyObject_GC_UnTrack(self);
@@ -753,26 +578,7 @@ static void PSequence_dealloc(PSequence* self) {
 
 // {{{ FIter
 
-static inline FIter* FIter_alloc() {
-	return (FIter*)PyMem_Malloc(sizeof(FIter));
-}
-
-static inline FIter* FIter_make(
-	FIterT type,
-	int index,
-	void* item,
-	FIter* next
-) {
-	FIter* iter = FIter_alloc();
-	iter->type = type;
-	iter->index = index;
-	iter->tree = item;
-	iter->next = next;
-	FIter_incRef(iter);
-	return iter;
-}
-
-static void FIter_dealloc(FIter* iter, bool all) {
+void FIter_dealloc(FIter* iter, bool all) {
 	if(iter == NULL) return;
 	FIter_decRef(iter);
 	FIter* next = iter->next;
@@ -784,7 +590,7 @@ static void FIter_dealloc(FIter* iter, bool all) {
 
 // {{{ PSequenceIter
 
-static PSequenceIter* PSequenceIter_make(
+PSequenceIter* PSequenceIter_make(
 	Py_ssize_t index,
 	bool reverse,
 	PSequence* seq,
@@ -799,7 +605,7 @@ static PSequenceIter* PSequenceIter_make(
 	return iter;
 }
 
-static void PSequenceIter_dealloc(PSequenceIter* self) {
+void PSequenceIter_dealloc(PSequenceIter* self) {
 	PyObject_GC_UnTrack(self);
 	Py_DECREF(self->seq);
 	FIter_dealloc(self->stack, true);
@@ -810,7 +616,7 @@ static void PSequenceIter_dealloc(PSequenceIter* self) {
 
 // {{{ PSequenceEvolver
 
-static PSequenceEvolver* PSequenceEvolver_make(PSequence* seq) {
+PSequenceEvolver* PSequenceEvolver_make(PSequence* seq) {
 	assert(seq != NULL);
 	PSequenceEvolver* evo = PyObject_GC_New(
 		PSequenceEvolver, &PSequenceEvolverType);
@@ -819,7 +625,7 @@ static PSequenceEvolver* PSequenceEvolver_make(PSequence* seq) {
 	return evo;
 }
 
-static void PSequenceEvolver_dealloc(PSequenceEvolver* self) {
+void PSequenceEvolver_dealloc(PSequenceEvolver* self) {
 	PyObject_GC_UnTrack(self);
 	Py_TRASHCAN_SAFE_BEGIN(self);
 	Py_DECREF(self->seq);
@@ -829,50 +635,11 @@ static void PSequenceEvolver_dealloc(PSequenceEvolver* self) {
 
 // }}}
 
-// {{{ misc
-
-static inline FView FView_make(FNode* node, FTree* tree) {
-	FView view = { .node=node, .tree=tree };
-	return view;
-}
-
-static inline FSplit FSplit_make(FTree* left, FNode* node, FTree* right) {
-	FSplit split = { .left=left, .node=node, .right=right };
-	return split;
-}
-
-static inline FIndex FIndex_make(size_t idx, FNode* node) {
-	FIndex index = { .index=idx, .node=node };
-	return index;
-}
-
-static inline FIndex2 FIndex2_make(size_t idx1, size_t idx2, FNode* node) {
-	FIndex2 index = { .index1=idx1, .index2=idx2, .node=node };
-	return index;
-}
-
-static inline FInsert FInsert_make(FNode* extra, void* value) {
-	FInsert insert = { .extra=extra, .node=value };
-	return insert;
-}
-
-static inline FMeld FMeld_make(bool full, void* value) {
-	FMeld meld = { .full=full, .node=value };
-	return meld;
-}
-
-static inline FMerge FMerge_make(FNode* left, FNode* right) {
-	FMerge merge = { .left=left, .right=right };
-	return merge;
-}
-
-// }}}
-
 // }}}
 
 // {{{ toTree
 
-static PyObject* FNode_toTree(const FNode* node) {
+PyObject* FNode_toTree(const FNode* node) {
 	assert(node != NULL);
 	if(node->size == 1)
 		return Py_BuildValue("(slO)",
@@ -889,7 +656,7 @@ static PyObject* FNode_toTree(const FNode* node) {
 		FNode_toTree(node->items[2]));
 }
 
-static PyObject* FDigit_toTree(const FDigit* digit) {
+PyObject* FDigit_toTree(const FDigit* digit) {
 	assert(digit != NULL);
 	switch(digit->count) {
 		case 1:
@@ -918,7 +685,7 @@ static PyObject* FDigit_toTree(const FDigit* digit) {
 	} // LCOV_EXCL_LINE
 }
 
-static PyObject* FTree_toTree(const FTree* tree) {
+PyObject* FTree_toTree(const FTree* tree) {
 	assert(tree != NULL);
 	switch(tree->type) {
 		case FEmptyT: return Py_BuildValue("(sl)", "Tree", 0);
@@ -934,7 +701,7 @@ static PyObject* FTree_toTree(const FTree* tree) {
 	} // LCOV_EXCL_LINE
 }
 
-static PyObject* PSequence_toTree(PSequence* self) {
+PyObject* PSequence_toTree(PSequence* self) {
 	return FTree_toTree(self->tree);
 }
 
@@ -942,7 +709,7 @@ static PyObject* PSequence_toTree(PSequence* self) {
 
 // {{{ fromTuple
 
-static bool FTuple_checkType(PyObject* arg, const char* name) {
+bool FTuple_checkType(PyObject* arg, const char* name) {
 	if(!PyTuple_Check(arg)) return PyErr_Format(
 		PyExc_TypeError, "expected tuple");
 	Py_ssize_t argc = PyTuple_GET_SIZE(arg);
@@ -955,7 +722,7 @@ static bool FTuple_checkType(PyObject* arg, const char* name) {
 	return true;
 }
 
-static FNode* FNode_fromTuple(PyObject* arg) {
+FNode* FNode_fromTuple(PyObject* arg) {
 	if(!FTuple_checkType(arg, "Node")) return NULL;
 	switch(PyTuple_GET_SIZE(arg)) {
 		case 3: return FNode_makeE(PObj_IncRef(PyTuple_GET_ITEM(arg, 2)));
@@ -977,7 +744,7 @@ static FNode* FNode_fromTuple(PyObject* arg) {
 	}
 }
 
-static FDigit* FDigit_fromTuple(PyObject* arg) {
+FDigit* FDigit_fromTuple(PyObject* arg) {
 	if(!FTuple_checkType(arg, "Digit")) return NULL;
 	int argc = PyTuple_GET_SIZE(arg);
 	switch(argc) {
@@ -999,7 +766,7 @@ static FDigit* FDigit_fromTuple(PyObject* arg) {
 	}
 }
 
-static FTree* FTree_fromTuple(PyObject* arg) {
+FTree* FTree_fromTuple(PyObject* arg) {
 	if(!FTuple_checkType(arg, "Tree")) return NULL;
 	switch(PyTuple_GET_SIZE(arg)) {
 		case 2: return FEmpty_make();
@@ -1022,7 +789,7 @@ static FTree* FTree_fromTuple(PyObject* arg) {
 	}
 }
 
-static PSequence* PSequence_fromTuple(void* _, PyObject* arg) {
+PSequence* PSequence_fromTuple(void* _, PyObject* arg) {
 	FTree* tree = FTree_fromTuple(arg);
 	if(tree == NULL) return NULL;
 	return PSequence_make(tree);
@@ -1032,7 +799,7 @@ static PSequence* PSequence_fromTuple(void* _, PyObject* arg) {
 
 // {{{ appendLeft
 
-static FDigit* FDigit_appendLeft(FDigit* digit, FNode* node) {
+FDigit* FDigit_appendLeft(FDigit* digit, FNode* node) {
 	assert(digit->count < 4);
 	switch(digit->count) {
 		case 3: return FDigit_make(digit->size + node->size, 4, node,
@@ -1048,7 +815,7 @@ static FDigit* FDigit_appendLeft(FDigit* digit, FNode* node) {
 	} // LCOV_EXCL_LINE
 }
 
-static FTree* FTree_appendLeft(FTree* tree, FNode* node) {
+FTree* FTree_appendLeft(FTree* tree, FNode* node) {
 	switch(tree->type) {
 		case FEmptyT:
 			return FSingle_make(node);
@@ -1077,7 +844,7 @@ static FTree* FTree_appendLeft(FTree* tree, FNode* node) {
 	} // LCOV_EXCL_LINE
 }
 
-static PSequence* PSequence_appendLeft(PSequence* self, PyObject* value) {
+PSequence* PSequence_appendLeft(PSequence* self, PyObject* value) {
 	return PSequence_make(FTree_appendLeft(self->tree,
 		FNode_makeE(PObj_IncRef(value))));
 }
@@ -1086,7 +853,7 @@ static PSequence* PSequence_appendLeft(PSequence* self, PyObject* value) {
 
 // {{{ appendRight
 
-static FDigit* FDigit_appendRight(FDigit* digit, FNode* node) {
+FDigit* FDigit_appendRight(FDigit* digit, FNode* node) {
 	assert(digit->count < 4);
 	switch(digit->count) {
 		case 3: return FDigit_make(digit->size + node->size, 4,
@@ -1105,7 +872,7 @@ static FDigit* FDigit_appendRight(FDigit* digit, FNode* node) {
 	} // LCOV_EXCL_LINE
 }
 
-static FTree* FTree_appendRight(FTree* tree, FNode* node) {
+FTree* FTree_appendRight(FTree* tree, FNode* node) {
 	switch(tree->type) {
 		case FEmptyT:
 			return FSingle_make(node);
@@ -1135,7 +902,7 @@ static FTree* FTree_appendRight(FTree* tree, FNode* node) {
 	} // LCOV_EXCL_LINE
 }
 
-static PSequence* PSequence_appendRight(PSequence* self, PyObject* value) {
+PSequence* PSequence_appendRight(PSequence* self, PyObject* value) {
 	return PSequence_make(
 		FTree_appendRight(self->tree,
 			FNode_makeE(PObj_IncRef(value))));
@@ -1145,9 +912,7 @@ static PSequence* PSequence_appendRight(PSequence* self, PyObject* value) {
 
 // {{{ viewLeft
 
-static FView FTree_viewLeft(FTree* tree);
-
-static FTree* FTree_pullLeft(FTree* middle, FDigit* right) {
+FTree* FTree_pullLeft(FTree* middle, FDigit* right) {
 	if(FTree_empty(middle))
 		return FTree_fromDigit(right);
 	FView view = FTree_viewLeft(middle);
@@ -1157,7 +922,7 @@ static FTree* FTree_pullLeft(FTree* middle, FDigit* right) {
 	return tail;
 }
 
-static FView FTree_viewLeft(FTree* tree) {
+FView FTree_viewLeft(FTree* tree) {
 	assert(tree != NULL);
 	switch(tree->type) {
 		case FSingleT: return FView_make(tree->single, FEmpty_make());
@@ -1179,7 +944,7 @@ static FView FTree_viewLeft(FTree* tree) {
 	} // LCOV_EXCL_LINE
 }
 
-static PyObject* PSequence_viewLeft(PSequence* self) {
+PyObject* PSequence_viewLeft(PSequence* self) {
 	if(FTree_empty(self->tree))
 		return PyErr_Format(PyExc_IndexError, "view from empty sequence");
 	FView view = FTree_viewLeft(self->tree);
@@ -1192,9 +957,7 @@ static PyObject* PSequence_viewLeft(PSequence* self) {
 
 // {{{ viewRight
 
-static FView FTree_viewRight(FTree* tree);
-
-static FTree* FTree_pullRight(FDigit* left, FTree* middle) {
+FTree* FTree_pullRight(FDigit* left, FTree* middle) {
 	if(FTree_empty(middle))
 		return FTree_fromDigit(left);
 	FView view = FTree_viewRight(middle);
@@ -1204,7 +967,7 @@ static FTree* FTree_pullRight(FDigit* left, FTree* middle) {
 	return init;
 }
 
-static FView FTree_viewRight(FTree* tree) {
+FView FTree_viewRight(FTree* tree) {
 	assert(tree != NULL);
 	switch(tree->type) {
 		case FSingleT: return FView_make(tree->single, FEmpty_make());
@@ -1226,7 +989,7 @@ static FView FTree_viewRight(FTree* tree) {
 	} // LCOV_EXCL_LINE
 }
 
-static PyObject* PSequence_viewRight(PSequence* self) {
+PyObject* PSequence_viewRight(PSequence* self) {
 	if(FTree_empty(self->tree))
 		return PyErr_Format(PyExc_IndexError, "view from empty sequence");
 	FView view = FTree_viewRight(self->tree);
@@ -1239,7 +1002,7 @@ static PyObject* PSequence_viewRight(PSequence* self) {
 
 // {{{ peek
 
-static PyObject* FTree_peekLeft(FTree* tree) {
+PyObject* FTree_peekLeft(FTree* tree) {
 	switch(tree->type) {
 		case FEmptyT: return PyErr_Format(
 			PyExc_IndexError, "peek from empty sequence");
@@ -1253,11 +1016,11 @@ static PyObject* FTree_peekLeft(FTree* tree) {
 	} // LCOV_EXCL_LINE
 }
 
-static PyObject* PSequence_peekLeft(PSequence* self, void* UNUSED _ignore) {
+PyObject* PSequence_peekLeft(PSequence* self, void* UNUSED _ignore) {
 	return FTree_peekLeft(self->tree);
 }
 
-static PyObject* FTree_peekRight(FTree* tree) {
+PyObject* FTree_peekRight(FTree* tree) {
 	switch(tree->type) {
 		case FEmptyT: return PyErr_Format(
 			PyExc_IndexError, "peek from empty sequence");
@@ -1273,7 +1036,7 @@ static PyObject* FTree_peekRight(FTree* tree) {
 	} // LCOV_EXCL_LINE
 }
 
-static PyObject* PSequence_peekRight(PSequence* self, void* UNUSED _ignore) {
+PyObject* PSequence_peekRight(PSequence* self, void* UNUSED _ignore) {
 	return FTree_peekRight(self->tree);
 }
 
@@ -1281,7 +1044,7 @@ static PyObject* PSequence_peekRight(PSequence* self, void* UNUSED _ignore) {
 
 // {{{ fromIterable
 
-static FTree* FTree_fromNodes(size_t size, size_t count, FNode** nodes) {
+FTree* FTree_fromNodes(size_t size, size_t count, FNode** nodes) {
 	#ifndef NDEBUG
 		size_t sizeD = 0;
 		for(size_t i = 0; i < count; ++i)
@@ -1330,7 +1093,7 @@ static FTree* FTree_fromNodes(size_t size, size_t count, FNode** nodes) {
 	return tree;
 }
 
-static PSequence* PSequence_fromIterable(PyObject* sequence) {
+PSequence* PSequence_fromIterable(PyObject* sequence) {
 	assert(sequence != NULL);
 	if(sequence == Py_None)
 		return PObj_IncRef(EMPTY_SEQUENCE);
@@ -1355,7 +1118,7 @@ static PSequence* PSequence_fromIterable(PyObject* sequence) {
 
 // {{{ toTuple
 
-static size_t FNode_toTuple(FNode* node, PyObject* tuple, size_t index) {
+size_t FNode_toTuple(FNode* node, PyObject* tuple, size_t index) {
 	assert(node != NULL);
 	if(node->size == 1) {
 		PyTuple_SET_ITEM(tuple, index, PObj_IncRef(node->value));
@@ -1368,14 +1131,14 @@ static size_t FNode_toTuple(FNode* node, PyObject* tuple, size_t index) {
 	return index;
 }
 
-static size_t FDigit_toTuple(FDigit* digit, PyObject* tuple, size_t index) {
+size_t FDigit_toTuple(FDigit* digit, PyObject* tuple, size_t index) {
 	assert(digit != NULL);
 	for(int i = 0; i < digit->count; ++i)
 		index = FNode_toTuple(digit->items[i], tuple, index);
 	return index;
 }
 
-static size_t FTree_toTuple(FTree* tree, PyObject* tuple, size_t index) {
+size_t FTree_toTuple(FTree* tree, PyObject* tuple, size_t index) {
 	assert(tree != NULL);
 	switch(tree->type) {
 		case FEmptyT: return index;
@@ -1388,7 +1151,7 @@ static size_t FTree_toTuple(FTree* tree, PyObject* tuple, size_t index) {
 	} // LCOV_EXCL_LINE
 }
 
-static PyObject* PSequence_toTuple(PSequence* self) {
+PyObject* PSequence_toTuple(PSequence* self) {
 	size_t size = FTree_size(self->tree);
 	PyObject* tuple = PyTuple_New(size);
 	if(tuple == NULL) return NULL;
@@ -1402,7 +1165,7 @@ static PyObject* PSequence_toTuple(PSequence* self) {
 
 // {{{ toList
 
-static size_t FNode_toList(FNode* node, PyObject* list, size_t index) {
+size_t FNode_toList(FNode* node, PyObject* list, size_t index) {
 	assert(node != NULL);
 	if(node->size == 1) {
 		PyList_SET_ITEM(list, index, PObj_IncRef(node->value));
@@ -1415,14 +1178,14 @@ static size_t FNode_toList(FNode* node, PyObject* list, size_t index) {
 	return index;
 }
 
-static size_t FDigit_toList(FDigit* digit, PyObject* list, size_t index) {
+size_t FDigit_toList(FDigit* digit, PyObject* list, size_t index) {
 	assert(digit != NULL);
 	for(int i = 0; i < digit->count; ++i)
 		index = FNode_toList(digit->items[i], list, index);
 	return index;
 }
 
-static size_t FTree_toList(FTree* tree, PyObject* list, size_t index) {
+size_t FTree_toList(FTree* tree, PyObject* list, size_t index) {
 	assert(tree != NULL);
 	switch(tree->type) {
 		case FEmptyT: return index;
@@ -1435,7 +1198,7 @@ static size_t FTree_toList(FTree* tree, PyObject* list, size_t index) {
 	} // LCOV_EXCL_LINE
 }
 
-static PyObject* PSequence_toList(PSequence* self) {
+PyObject* PSequence_toList(PSequence* self) {
 	size_t size = FTree_size(self->tree);
 	PyObject* list = PyList_New(size);
 	if(list == NULL) return NULL;
@@ -1449,7 +1212,7 @@ static PyObject* PSequence_toList(PSequence* self) {
 
 // {{{ getItem
 
-static void* FNode_getItem(const FNode* node, size_t index) {
+void* FNode_getItem(const FNode* node, size_t index) {
 	assert(node != NULL);
 	assert(index < node->size);
 	if(node->size == 1)
@@ -1464,7 +1227,7 @@ static void* FNode_getItem(const FNode* node, size_t index) {
 	return FNode_getItem(node->items[2], index);
 }
 
-static void* FDigit_getItem(const FDigit* digit, size_t index) {
+void* FDigit_getItem(const FDigit* digit, size_t index) {
 	assert(index < digit->size);
 	size_t size;
 	for(int i = 0; i < digit->count; ++i)
@@ -1475,7 +1238,7 @@ static void* FDigit_getItem(const FDigit* digit, size_t index) {
 	assert(false); // LCOV_EXCL_LINE
 }
 
-static void* FTree_getItem(const FTree* tree, size_t index) {
+void* FTree_getItem(const FTree* tree, size_t index) {
 	assert(index < FTree_size(tree));
 	switch(tree->type) {
 		case FSingleT: return FNode_getItem(tree->single, index);
@@ -1492,7 +1255,7 @@ static void* FTree_getItem(const FTree* tree, size_t index) {
 	} // LCOV_EXCL_LINE
 }
 
-static PyObject* PSequence_getItem(const PSequence* self, Py_ssize_t index) {
+PyObject* PSequence_getItem(const PSequence* self, Py_ssize_t index) {
 	if(!(0 <= index && index < FTree_ssize(self->tree)))
 		return PSequence_indexError(index);
 	PyObject* value = FTree_getItem(self->tree, index);
@@ -1500,7 +1263,7 @@ static PyObject* PSequence_getItem(const PSequence* self, Py_ssize_t index) {
 	return PObj_IncRef(value);
 }
 
-static PyObject* PSequence_getItemS(const PSequence* self, Py_ssize_t index) {
+PyObject* PSequence_getItemS(const PSequence* self, Py_ssize_t index) {
 	if(index < 0) index += FTree_ssize(self->tree);
 	return PSequence_getItem(self, index);
 }
@@ -1509,7 +1272,7 @@ static PyObject* PSequence_getItemS(const PSequence* self, Py_ssize_t index) {
 
 // {{{ traverse
 
-static int FNode_traverse(FNode* node, visitproc visit, void* arg) {
+int FNode_traverse(FNode* node, visitproc visit, void* arg) {
 	assert(node != NULL);
 	if(node->size == 1) {
 		Py_VISIT(node->value);
@@ -1523,7 +1286,7 @@ static int FNode_traverse(FNode* node, visitproc visit, void* arg) {
 	return FNode_traverse(node->items[2], visit, arg);
 }
 
-static int FDigit_traverse(FDigit* digit, visitproc visit, void* arg) {
+int FDigit_traverse(FDigit* digit, visitproc visit, void* arg) {
 	assert(digit != NULL);
 	for(int i = 0; i < digit->count; ++i) {
 		int ret = FNode_traverse(digit->items[i], visit, arg);
@@ -1532,7 +1295,7 @@ static int FDigit_traverse(FDigit* digit, visitproc visit, void* arg) {
 	return 0;
 }
 
-static int FTree_traverse(FTree* tree, visitproc visit, void* arg) {
+int FTree_traverse(FTree* tree, visitproc visit, void* arg) {
 	assert(tree != NULL);
 	switch(tree->type) {
 		case FEmptyT: return 0;
@@ -1548,7 +1311,7 @@ static int FTree_traverse(FTree* tree, visitproc visit, void* arg) {
 	} // LCOV_EXCL_LINE
 }
 
-static int PSequence_traverse(PSequence* self, visitproc visit, void* arg) {
+int PSequence_traverse(PSequence* self, visitproc visit, void* arg) {
 	return FTree_traverse(self->tree, visit, arg);
 }
 
@@ -1556,9 +1319,7 @@ static int PSequence_traverse(PSequence* self, visitproc visit, void* arg) {
 
 // {{{ concat
 
-static FTree* FTree_extend(FTree* xs, FTree* ys);
-
-static FTree* FDeep_extend(FDeep* xs, FDeep* ys) {
+FTree* FDeep_extend(FDeep* xs, FDeep* ys) {
 	size_t size = xs->size + ys->size;
 	FNode* mid[8]; int count = 0;
 	for(; count < xs->right->count; ++count)
@@ -1596,7 +1357,7 @@ static FTree* FDeep_extend(FDeep* xs, FDeep* ys) {
 		FDigit_incRef(ys->right)));
 }
 
-static FTree* FTree_extend(FTree* xs, FTree* ys) {
+FTree* FTree_extend(FTree* xs, FTree* ys) {
 	switch(xs->type) {
 		case FEmptyT: return FTree_incRef(ys);
 		case FSingleT: return FTree_appendLeft(ys, FNode_incRef(xs->single));
@@ -1610,7 +1371,7 @@ static FTree* FTree_extend(FTree* xs, FTree* ys) {
 	} // LCOV_EXCL_LINE
 }
 
-static PSequence* PSequence_extendRight(PSequence* self, PyObject* arg) {
+PSequence* PSequence_extendRight(PSequence* self, PyObject* arg) {
 	PSequence* other = PSequence_fromIterable(arg);
 	if(other == NULL) return NULL;
 	PSequence* ret = PSequence_make(FTree_extend(self->tree, other->tree));
@@ -1618,7 +1379,7 @@ static PSequence* PSequence_extendRight(PSequence* self, PyObject* arg) {
 	return ret;
 }
 
-static PSequence* PSequence_extendLeft(PSequence* self, PyObject* arg) {
+PSequence* PSequence_extendLeft(PSequence* self, PyObject* arg) {
 	PSequence* other = PSequence_fromIterable(arg);
 	if(other == NULL) return NULL;
 	PSequence* ret = PSequence_make(FTree_extend(other->tree, self->tree));
@@ -1630,7 +1391,7 @@ static PSequence* PSequence_extendLeft(PSequence* self, PyObject* arg) {
 
 // {{{ repeat
 
-static PSequence* PSequence_repeat(PSequence* self, Py_ssize_t count) {
+PSequence* PSequence_repeat(PSequence* self, Py_ssize_t count) {
 	if(count <= 0) return PObj_IncRef(EMPTY_SEQUENCE);
 	FTree* result = FEmpty_make();
 	FTree* tree = FTree_incRef(self->tree);
@@ -1646,7 +1407,7 @@ static PSequence* PSequence_repeat(PSequence* self, Py_ssize_t count) {
 
 // {{{ setItem
 
-static FNode* FNode_setItem(
+FNode* FNode_setItem(
 	const FNode* node,
 	size_t index,
 	const PyObject* value
@@ -1674,7 +1435,7 @@ static FNode* FNode_setItem(
 		FNode_setItem(node->items[2], index, value));
 }
 
-static FDigit* FDigit_setItem(
+FDigit* FDigit_setItem(
 	const FDigit* digit,
 	size_t index,
 	const PyObject* value
@@ -1694,7 +1455,7 @@ static FDigit* FDigit_setItem(
 	assert(false); // LCOV_EXCL_LINE
 }
 
-static FTree* FTree_setItem(
+FTree* FTree_setItem(
 	const FTree* tree,
 	size_t index,
 	const PyObject* value
@@ -1725,7 +1486,7 @@ static FTree* FTree_setItem(
 	} // LCOV_EXCL_LINE
 }
 
-static PSequence* PSequence_setItem(
+PSequence* PSequence_setItem(
 	PSequence* self,
 	Py_ssize_t index,
 	PyObject* value
@@ -1736,7 +1497,7 @@ static PSequence* PSequence_setItem(
 		self->tree, index, PObj_IncRef(value)));
 }
 
-static PSequence* PSequence_setItemS(
+PSequence* PSequence_setItemS(
 	PSequence* self,
 	Py_ssize_t index,
 	PyObject* value
@@ -1763,7 +1524,7 @@ static PSequence* PSequence_setItemS(
 
 // {{{ msetItem
 
-static FNode* FNode_msetItem(FNode* node, FMset* mset) {
+FNode* FNode_msetItem(FNode* node, FMset* mset) {
 	if(mset->count == 0)
 		return FNode_incRef(node);
 	if(mset->index + node->size <= mset->items->index1) {
@@ -1784,7 +1545,7 @@ static FNode* FNode_msetItem(FNode* node, FMset* mset) {
 	return FNode_make(node->size, nodes[0], nodes[1], nodes[2]);
 }
 
-static FDigit* FDigit_msetItem(FDigit* digit, FMset* mset) {
+FDigit* FDigit_msetItem(FDigit* digit, FMset* mset) {
 	if(mset->count == 0)
 		return FDigit_incRef(digit);
 	if(mset->index + digit->size <= mset->items->index1) {
@@ -1797,7 +1558,7 @@ static FDigit* FDigit_msetItem(FDigit* digit, FMset* mset) {
 	return FDigit_makeN(digit->size, digit->count, nodes);
 }
 
-static FTree* FTree_msetItem(FTree* tree, FMset* mset) {
+FTree* FTree_msetItem(FTree* tree, FMset* mset) {
 	if(mset->count == 0)
 		return FTree_incRef(tree);
 	if(mset->index + FTree_size(tree) <= mset->items->index1) {
@@ -1817,7 +1578,7 @@ static FTree* FTree_msetItem(FTree* tree, FMset* mset) {
 	} // LCOV_EXCL_LINE
 }
 
-static PSequence* PSequence_msetItemN(PSequence* self, PyObject* args) {
+PSequence* PSequence_msetItemN(PSequence* self, PyObject* args) {
 	Py_ssize_t argc = PyTuple_GET_SIZE(args);
 	if(argc == 0) return PObj_IncRef(self);
 	FMset mset = { .index = 0, .count = 0, .items = NULL };
@@ -1873,7 +1634,7 @@ static PSequence* PSequence_msetItemN(PSequence* self, PyObject* args) {
 
 // {{{ insertItem
 
-static FInsert FNode_insertItem(FNode* node, size_t index, PyObject* item) {
+FInsert FNode_insertItem(FNode* node, size_t index, PyObject* item) {
 	assert(index < node->size);
 	if(node->size == 1) return FInsert_make(
 		FNode_incRef(node), FNode_makeE(PObj_IncRef(item)));
@@ -1920,7 +1681,7 @@ static FInsert FNode_insertItem(FNode* node, size_t index, PyObject* item) {
 		FNode_makeS(nodes[0], nodes[1], NULL));
 }
 
-static FInsert FDigit_insertLeft(FDigit* digit, size_t index, PyObject* item) {
+FInsert FDigit_insertLeft(FDigit* digit, size_t index, PyObject* item) {
 	assert(index < digit->size);
 	FNode* nodes[5] = { NULL, NULL, NULL, NULL, NULL };
 	int mid = 0, count;
@@ -1952,7 +1713,7 @@ static FInsert FDigit_insertLeft(FDigit* digit, size_t index, PyObject* item) {
 		FDigit_makeNS(2, nodes));
 }
 
-static FInsert FDigit_insertRight(FDigit* digit, size_t index, PyObject* item) {
+FInsert FDigit_insertRight(FDigit* digit, size_t index, PyObject* item) {
 	assert(index < digit->size);
 	FNode* nodes[5] = { NULL, NULL, NULL, NULL, NULL };
 	int mid = 0, count;
@@ -1984,7 +1745,7 @@ static FInsert FDigit_insertRight(FDigit* digit, size_t index, PyObject* item) {
 		FDigit_makeNS(2, nodes + 3));
 }
 
-static FTree* FTree_insertItem(FTree* tree, size_t index, PyObject* item) {
+FTree* FTree_insertItem(FTree* tree, size_t index, PyObject* item) {
 	assert(index < FTree_size(tree));
 	switch(tree->type) {
 		case FSingleT: {
@@ -2034,7 +1795,7 @@ static FTree* FTree_insertItem(FTree* tree, size_t index, PyObject* item) {
 	} // LCOV_EXCL_LINE
 }
 
-static PSequence* PSequence_insertItemN(PSequence* self, PyObject* args) {
+PSequence* PSequence_insertItemN(PSequence* self, PyObject* args) {
 	Py_ssize_t index; PyObject* value;
 	if(!PyArg_ParseTuple(args, "nO", &index, &value)) return NULL;
 	if(!FTree_checkIndex(self->tree, &index)) {
@@ -2048,7 +1809,7 @@ static PSequence* PSequence_insertItemN(PSequence* self, PyObject* args) {
 
 // {{{ merge/meld
 
-static FMerge FNode_mergeLeft(FNode* left, FNode* node) {
+FMerge FNode_mergeLeft(FNode* left, FNode* node) {
 	if(left == NULL)
 		return FMerge_make(FNode_incRef(node), NULL);
 	assert(FNode_depth(left) + 1 == FNode_depth(node));
@@ -2066,7 +1827,7 @@ static FMerge FNode_mergeLeft(FNode* left, FNode* node) {
 			FNode_incRef(node->items[2]), NULL));
 }
 
-static FMerge FNode_mergeRight(FNode* node, FNode* right) {
+FMerge FNode_mergeRight(FNode* node, FNode* right) {
 	if(right == NULL)
 		return FMerge_make(FNode_incRef(node), NULL);
 	assert(FNode_depth(node) == FNode_depth(right) + 1);
@@ -2084,7 +1845,7 @@ static FMerge FNode_mergeRight(FNode* node, FNode* right) {
 			right, NULL));
 }
 
-static FDigit* FDigit_mergeLeft(FNode* left, FNode* node) {
+FDigit* FDigit_mergeLeft(FNode* left, FNode* node) {
 	if(left == NULL)
 		return FDigit_fromNode(node);
 	assert(FNode_depth(left) + 2 == FNode_depth(node));
@@ -2103,7 +1864,7 @@ static FDigit* FDigit_mergeLeft(FNode* left, FNode* node) {
 		FNode_incRefM(node->items[2]));
 }
 
-static FDigit* FDigit_mergeRight(FNode* node, FNode* right) {
+FDigit* FDigit_mergeRight(FNode* node, FNode* right) {
 	if(right == NULL)
 		return FDigit_fromNode(node);
 	assert(FNode_depth(right) + 2 == FNode_depth(node));
@@ -2121,7 +1882,7 @@ static FDigit* FDigit_mergeRight(FNode* node, FNode* right) {
 	}
 }
 
-static FMeld FNode_meldLeft(FNode* extra, FMerge merge) {
+FMeld FNode_meldLeft(FNode* extra, FMerge merge) {
 	if(merge.extra != NULL) {
 		if(extra == NULL)
 			return FMeld_make(true, FNode_makeS(merge.left, merge.right, NULL));
@@ -2134,7 +1895,7 @@ static FMeld FNode_meldLeft(FNode* extra, FMerge merge) {
 		FNode_incRef(extra), merge.node, NULL));
 }
 
-static FMeld FNode_meldRight(FMerge merge, FNode* extra) {
+FMeld FNode_meldRight(FMerge merge, FNode* extra) {
 	if(merge.extra != NULL) 
 		return FMeld_make(true, FNode_makeS(
 			merge.left, merge.right, FNode_incRefM(extra)));
@@ -2148,9 +1909,7 @@ static FMeld FNode_meldRight(FMerge merge, FNode* extra) {
 
 // {{{ deleteItem
 
-static FMeld FTree_deleteItem(FTree* tree, size_t index);
-
-static FMeld FNode_deleteItem(FNode* node, size_t index) {
+FMeld FNode_deleteItem(FNode* node, size_t index) {
 	assert(index < node->size);
 	if(node->size == 1) return FMeld_make(false, NULL);
 	size_t size;
@@ -2181,7 +1940,7 @@ static FMeld FNode_deleteItem(FNode* node, size_t index) {
 	}
 }
 
-static FMeld FDigit_deleteItem(FDigit* digit, size_t index) {
+FMeld FDigit_deleteItem(FDigit* digit, size_t index) {
 	assert(index < digit->size);
 	FNode* nodes[4] = { NULL, NULL, NULL, NULL };
 	int mid = 0, count;
@@ -2230,7 +1989,7 @@ static FMeld FDigit_deleteItem(FDigit* digit, size_t index) {
 	return FMeld_make(true, FDigit_makeNS(count, nodes));
 }
 
-static FMeld FTree_deleteItemLeft(FTree* tree, size_t index) {
+FMeld FTree_deleteItemLeft(FTree* tree, size_t index) {
 	FMeld meld = FDigit_deleteItem(tree->deep->left, index);
 	if(meld.full) return FMeld_make(true, FDeep_make(tree->deep->size - 1,
 		meld.digit,
@@ -2255,7 +2014,7 @@ static FMeld FTree_deleteItemLeft(FTree* tree, size_t index) {
 			tree->deep->right->items + 1)));
 }
 
-static FMeld FTree_deleteItemRight(FTree* tree, size_t index) {
+FMeld FTree_deleteItemRight(FTree* tree, size_t index) {
 	FMeld meld = FDigit_deleteItem(tree->deep->right, index);
 	if(meld.full) return FMeld_make(true, FDeep_make(tree->deep->size - 1,
 		FDigit_incRef(tree->deep->left),
@@ -2281,7 +2040,7 @@ static FMeld FTree_deleteItemRight(FTree* tree, size_t index) {
 		FDigit_fromMerge(merge)));
 }
 
-static FMeld FTree_deleteItemMiddle(FTree* tree, size_t index) {
+FMeld FTree_deleteItemMiddle(FTree* tree, size_t index) {
 	FMeld meld = FTree_deleteItem(tree->deep->middle, index);
 	if(meld.full) return FMeld_make(true, FDeep_make(tree->deep->size - 1,
 		FDigit_incRef(tree->deep->left),
@@ -2305,7 +2064,7 @@ static FMeld FTree_deleteItemMiddle(FTree* tree, size_t index) {
 		FDigit_incRef(tree->deep->right)));
 }
 
-static FMeld FTree_deleteItem(FTree* tree, size_t index) {
+FMeld FTree_deleteItem(FTree* tree, size_t index) {
 	assert(index < FTree_size(tree));
 	switch(tree->type) {
 		case FSingleT: {
@@ -2328,7 +2087,7 @@ static FMeld FTree_deleteItem(FTree* tree, size_t index) {
 	} // LCOV_EXCL_LINE
 }
 
-static PSequence* PSequence_deleteItem(PSequence* self, Py_ssize_t index) {
+PSequence* PSequence_deleteItem(PSequence* self, Py_ssize_t index) {
 	if(!(0 <= index && index < FTree_ssize(self->tree)))
 		return PSequence_indexError(index);
 	FMeld meld = FTree_deleteItem(self->tree, index);
@@ -2337,7 +2096,7 @@ static PSequence* PSequence_deleteItem(PSequence* self, Py_ssize_t index) {
 	return PSequence_make(meld.tree);
 }
 
-static PSequence* PSequence_deleteItemS(PSequence* self, Py_ssize_t index) {
+PSequence* PSequence_deleteItemS(PSequence* self, Py_ssize_t index) {
 	if(!FTree_checkIndex(self->tree, &index))
 		return PSequence_indexError(index);
 	FMeld meld = FTree_deleteItem(self->tree, index);
@@ -2350,7 +2109,7 @@ static PSequence* PSequence_deleteItemS(PSequence* self, Py_ssize_t index) {
 
 // {{{ contains
 
-static int FNode_contains(FNode* node, PyObject* arg) {
+int FNode_contains(FNode* node, PyObject* arg) {
 	assert(node != NULL);
 	if(node->size == 1)
 		return PyObject_RichCompareBool(node->value, arg, Py_EQ);
@@ -2361,7 +2120,7 @@ static int FNode_contains(FNode* node, PyObject* arg) {
 	return FNode_contains(node->items[2], arg);
 }
 
-static int FDigit_contains(FDigit* digit, PyObject* arg) {
+int FDigit_contains(FDigit* digit, PyObject* arg) {
 	assert(digit != NULL);
 	for(int i = 0; i < digit->count; ++i) {
 		int comp = FNode_contains(digit->items[i], arg);
@@ -2370,7 +2129,7 @@ static int FDigit_contains(FDigit* digit, PyObject* arg) {
 	return 0;
 }
 
-static int FTree_contains(FTree* tree, PyObject* arg) {
+int FTree_contains(FTree* tree, PyObject* arg) {
 	assert(tree != NULL);
 	switch(tree->type) {
 		case FEmptyT: return 0;
@@ -2384,7 +2143,7 @@ static int FTree_contains(FTree* tree, PyObject* arg) {
 	} // LCOV_EXCL_LINE
 }
 
-static int PSequence_contains(PSequence* self, PyObject* arg) {
+int PSequence_contains(PSequence* self, PyObject* arg) {
 	return FTree_contains(self->tree, arg);
 }
 
@@ -2392,16 +2151,13 @@ static int PSequence_contains(PSequence* self, PyObject* arg) {
 
 // {{{ indexItem
 
-static PSequence* PSequence_takeLeft(PSequence* self, Py_ssize_t index);
-static PSequence* PSequence_takeRight(PSequence* self, Py_ssize_t index);
-
 #define check_and_return(index, offset) do { \
 	Py_ssize_t _idx = index; \
 	if(_idx < 0) return _idx; \
 	if(_idx > 0) return _idx + (offset); \
 	} while(0)
 
-static Py_ssize_t FNode_indexItem(FNode* node, PyObject* arg) {
+Py_ssize_t FNode_indexItem(FNode* node, PyObject* arg) {
 	assert(node != NULL);
 	if(node->size == 1) return (Py_ssize_t)
 		PyObject_RichCompareBool(node->value, arg, Py_EQ);
@@ -2414,7 +2170,7 @@ static Py_ssize_t FNode_indexItem(FNode* node, PyObject* arg) {
 	return 0;
 }
 
-static Py_ssize_t FDigit_indexItem(FDigit* digit, PyObject* arg) {
+Py_ssize_t FDigit_indexItem(FDigit* digit, PyObject* arg) {
 	assert(digit != NULL);
 	int offset = 0;
 	for(int i = 0; i < digit->count; ++i) {
@@ -2424,7 +2180,7 @@ static Py_ssize_t FDigit_indexItem(FDigit* digit, PyObject* arg) {
 	return 0;
 }
 
-static Py_ssize_t FTree_indexItem(FTree* tree, PyObject* arg) {
+Py_ssize_t FTree_indexItem(FTree* tree, PyObject* arg) {
 	assert(tree != NULL);
 	switch(tree->type) {
 		case FEmptyT: return 0;
@@ -2442,7 +2198,7 @@ static Py_ssize_t FTree_indexItem(FTree* tree, PyObject* arg) {
 
 #undef check_and_return
 
-static PyObject* PSequence_indexItem(PSequence* self, PyObject* args) {
+PyObject* PSequence_indexItem(PSequence* self, PyObject* args) {
 	PyObject* value; Py_ssize_t start = 0, stop = FTree_ssize(self->tree);
 	if(!PyArg_ParseTuple(args, "O|nn", &value, &start, &stop)) return NULL;
 	PSequence* seq1 = PSequence_takeRight(self, FTree_ssize(self->tree) - start);
@@ -2460,7 +2216,7 @@ static PyObject* PSequence_indexItem(PSequence* self, PyObject* args) {
 
 // {{{ removeItem
 
-static PSequence* PSequence_removeItemN(PSequence* self, PyObject* arg) {
+PSequence* PSequence_removeItemN(PSequence* self, PyObject* arg) {
 	Py_ssize_t index = FTree_indexItem(self->tree, arg);
 	if(index < 0) return NULL;
 	if(index == 0) return (void*)
@@ -2476,7 +2232,7 @@ static PSequence* PSequence_removeItemN(PSequence* self, PyObject* arg) {
 
 // {{{ countItem
 
-static Py_ssize_t FNode_countItem(FNode* node, PyObject* arg) {
+Py_ssize_t FNode_countItem(FNode* node, PyObject* arg) {
 	assert(node != NULL);
 	if(node->size == 1)
 		return (Py_ssize_t)PyObject_RichCompareBool(node->value, arg, Py_EQ);
@@ -2490,7 +2246,7 @@ static Py_ssize_t FNode_countItem(FNode* node, PyObject* arg) {
 	return total + comp;
 }
 
-static Py_ssize_t FDigit_countItem(FDigit* digit, PyObject* arg) {
+Py_ssize_t FDigit_countItem(FDigit* digit, PyObject* arg) {
 	assert(digit != NULL);
 	int total = 0;
 	for(int i = 0; i < digit->count; ++i) {
@@ -2501,7 +2257,7 @@ static Py_ssize_t FDigit_countItem(FDigit* digit, PyObject* arg) {
 	return total;
 }
 
-static Py_ssize_t FTree_countItem(FTree* tree, PyObject* arg) {
+Py_ssize_t FTree_countItem(FTree* tree, PyObject* arg) {
 	assert(tree != NULL);
 	switch(tree->type) {
 		case FEmptyT: return 0;
@@ -2518,7 +2274,7 @@ static Py_ssize_t FTree_countItem(FTree* tree, PyObject* arg) {
 	} // LCOV_EXCL_LINE
 }
 
-static PyObject* PSequence_countItem(PSequence* self, PyObject* arg) {
+PyObject* PSequence_countItem(PSequence* self, PyObject* arg) {
 	return PyLong_FromSsize_t(FTree_countItem(self->tree, arg));
 }
 
@@ -2526,9 +2282,7 @@ static PyObject* PSequence_countItem(PSequence* self, PyObject* arg) {
 
 // {{{ splitView
 
-static FSplit FTree_splitView(FTree* tree, size_t index);
-
-static FSplit FDeep_splitViewLeft(FDeep* deep, size_t index) {
+FSplit FDeep_splitViewLeft(FDeep* deep, size_t index) {
 	size_t size, dsize = 0;
 	for(int i = 0; i < deep->left->count; ++i)
 		FNode_incRef(deep->left->items[i]);
@@ -2547,7 +2301,7 @@ static FSplit FDeep_splitViewLeft(FDeep* deep, size_t index) {
 	assert(false); // LCOV_EXCL_LINE
 }
 
-static FSplit FDeep_splitViewRight(FDeep* deep, size_t index) {
+FSplit FDeep_splitViewRight(FDeep* deep, size_t index) {
 	size_t size, dsize = 0;
 	for(int i = 0; i < deep->right->count; ++i)
 		FNode_incRef(deep->right->items[i]);
@@ -2565,7 +2319,7 @@ static FSplit FDeep_splitViewRight(FDeep* deep, size_t index) {
 	assert(false); // LCOV_EXCL_LINE
 }
 
-static FSplit FDeep_splitViewMiddle(FDeep* deep, size_t index) {
+FSplit FDeep_splitViewMiddle(FDeep* deep, size_t index) {
 	FSplit split = FTree_splitView(deep->middle, index);
 	assert(split.node->size != 1);
 	index -= FTree_size(split.left);
@@ -2612,7 +2366,7 @@ static FSplit FDeep_splitViewMiddle(FDeep* deep, size_t index) {
 	}
 }
 
-static FSplit FTree_splitView(FTree* tree, size_t index) {
+FSplit FTree_splitView(FTree* tree, size_t index) {
 	assert(index < FTree_size(tree));
 	switch(tree->type) {
 		case FSingleT: return FSplit_make(FEmpty_make(),
@@ -2631,7 +2385,7 @@ static FSplit FTree_splitView(FTree* tree, size_t index) {
 }
 
 // splitAt has to split nodes anyway, so just reuse splitView
-static PyObject* PSequence_splitAt(PSequence* self, PyObject* arg) {
+PyObject* PSequence_splitAt(PSequence* self, PyObject* arg) {
 	Py_ssize_t index = PyNumber_AsSsize_t(arg, PyExc_IndexError);
 	if(index == -1 && PyErr_Occurred()) return NULL;
 	if(!FTree_checkIndex(self->tree, &index) || index == 0) {
@@ -2644,7 +2398,7 @@ static PyObject* PSequence_splitAt(PSequence* self, PyObject* arg) {
 			FTree_appendLeft(split.right, FNode_incRef(split.node)))));
 }
 
-static PyObject* PSequence_view(PSequence* self, PyObject* args) {
+PyObject* PSequence_view(PSequence* self, PyObject* args) {
 	Py_ssize_t argc = PyTuple_GET_SIZE(args);
 	if(argc == 1) {
 		Py_ssize_t index = PyNumber_AsSsize_t(
@@ -2695,7 +2449,7 @@ static PyObject* PSequence_view(PSequence* self, PyObject* args) {
 
 // {{{ chunksOf
 
-static PSequence* PSequence_chunksOf(PSequence* self, Py_ssize_t chunk) {
+PSequence* PSequence_chunksOf(PSequence* self, Py_ssize_t chunk) {
 	if(FTree_empty(self->tree)) return PObj_IncRef(self);
 	if(chunk <= 0) return (void*)PyErr_Format(
 		PyExc_ValueError, "chunk size must be positive");
@@ -2712,7 +2466,7 @@ static PSequence* PSequence_chunksOf(PSequence* self, Py_ssize_t chunk) {
 		FNode_makeE((PyObject*)PSequence_make(right)))));
 }
 
-static PSequence* PSequence_chunksOfN(PSequence* self, PyObject* arg) {
+PSequence* PSequence_chunksOfN(PSequence* self, PyObject* arg) {
 	Py_ssize_t chunk = PyNumber_AsSsize_t(arg, PyExc_IndexError);
 	if(chunk == -1 && PyErr_Occurred()) return NULL;
 	return PSequence_chunksOf(self, chunk);
@@ -2722,9 +2476,7 @@ static PSequence* PSequence_chunksOfN(PSequence* self, PyObject* arg) {
 
 // {{{ takeLeft
 
-static FView FTree_takeLeft(FTree* tree, size_t index);
-
-static FView FDeep_takeLeftLeft(FDeep* deep, size_t index) {
+FView FDeep_takeLeftLeft(FDeep* deep, size_t index) {
 	size_t size, dsize = 0;
 	for(int i = 0; i < deep->left->count; ++i)
 		if(index >= (size = deep->left->items[i]->size)) {
@@ -2735,7 +2487,7 @@ static FView FDeep_takeLeftLeft(FDeep* deep, size_t index) {
 	assert(false); // LCOV_EXCL_LINE
 }
 
-static FView FDeep_takeLeftRight(FDeep* deep, size_t index) {
+FView FDeep_takeLeftRight(FDeep* deep, size_t index) {
 	size_t size, dsize = 0;
 	for(int i = 0; i < deep->right->count; ++i)
 		if(index >= (size = deep->right->items[i]->size)) {
@@ -2750,7 +2502,7 @@ static FView FDeep_takeLeftRight(FDeep* deep, size_t index) {
 	assert(false); // LCOV_EXCL_LINE
 }
 
-static FView FDeep_takeLeftMiddle(FDeep* deep, size_t index) {
+FView FDeep_takeLeftMiddle(FDeep* deep, size_t index) {
 	assert(index < deep->size);
 	FView view = FTree_takeLeft(deep->middle, index);
 	assert(view.node->size != 1);
@@ -2776,7 +2528,7 @@ static FView FDeep_takeLeftMiddle(FDeep* deep, size_t index) {
 			FNode_incRef(view.node->items[1]), NULL, NULL)));
 }
 
-static FView FTree_takeLeft(FTree* tree, size_t index) {
+FView FTree_takeLeft(FTree* tree, size_t index) {
 	assert(index < FTree_size(tree));
 	switch(tree->type) {
 		case FSingleT: return FView_make(tree->single, FEmpty_make());
@@ -2793,7 +2545,7 @@ static FView FTree_takeLeft(FTree* tree, size_t index) {
 	} // LCOV_EXCL_LINE
 }
 
-static PSequence* PSequence_takeLeft(PSequence* self, Py_ssize_t index) {
+PSequence* PSequence_takeLeft(PSequence* self, Py_ssize_t index) {
 	if(index <= 0) return PObj_IncRef(EMPTY_SEQUENCE);
 	if((size_t)index >= FTree_size(self->tree)) return PObj_IncRef(self);
 	FView view = FTree_takeLeft(self->tree, index);
@@ -2804,9 +2556,7 @@ static PSequence* PSequence_takeLeft(PSequence* self, Py_ssize_t index) {
 
 // {{{ takeRight
 
-static FView FTree_takeRight(FTree* tree, size_t index);
-
-static FView FDeep_takeRightLeft(FDeep* deep, size_t index) {
+FView FDeep_takeRightLeft(FDeep* deep, size_t index) {
 	size_t size, dsize = 0;
 	for(int i = deep->left->count; i-- > 0;)
 		if(index >= (size = deep->left->items[i]->size)) {
@@ -2823,7 +2573,7 @@ static FView FDeep_takeRightLeft(FDeep* deep, size_t index) {
 	assert(false); // LCOV_EXCL_LINE
 }
 
-static FView FDeep_takeRightRight(FDeep* deep, size_t index) {
+FView FDeep_takeRightRight(FDeep* deep, size_t index) {
 	size_t size, dsize = 0;
 	for(int i = deep->right->count; i-- > 0;)
 		if(index >= (size = deep->right->items[i]->size)) {
@@ -2835,7 +2585,7 @@ static FView FDeep_takeRightRight(FDeep* deep, size_t index) {
 	assert(false); // LCOV_EXCL_LINE
 }
 
-static FView FDeep_takeRightMiddle(FDeep* deep, size_t index) {
+FView FDeep_takeRightMiddle(FDeep* deep, size_t index) {
 	assert(index < deep->size);
 	FView view = FTree_takeRight(deep->middle, index);
 	assert(view.node->size != 1);
@@ -2867,7 +2617,7 @@ static FView FDeep_takeRightMiddle(FDeep* deep, size_t index) {
 		view.tree, FDigit_incRef(deep->right)));
 }
 
-static FView FTree_takeRight(FTree* tree, size_t index) {
+FView FTree_takeRight(FTree* tree, size_t index) {
 	assert(index < FTree_size(tree));
 	switch(tree->type) {
 		case FSingleT: return FView_make(tree->single, FEmpty_make());
@@ -2884,7 +2634,7 @@ static FView FTree_takeRight(FTree* tree, size_t index) {
 	} // LCOV_EXCL_LINE
 }
 
-static PSequence* PSequence_takeRight(PSequence* self, Py_ssize_t index) {
+PSequence* PSequence_takeRight(PSequence* self, Py_ssize_t index) {
 	if(index <= 0) return PObj_IncRef(EMPTY_SEQUENCE);
 	if((size_t)index >= FTree_size(self->tree)) return PObj_IncRef(self);
 	FView view = FTree_takeRight(self->tree, index);
@@ -2895,7 +2645,7 @@ static PSequence* PSequence_takeRight(PSequence* self, Py_ssize_t index) {
 
 // {{{ repr
 
-static PyObject* PSequence_repr(PSequence* self) {
+PyObject* PSequence_repr(PSequence* self) {
 	PyObject* list = PSequence_toList(self);
 	if(list == NULL) return NULL;
 	PyObject* repr = PyObject_Repr(list);
@@ -2910,7 +2660,7 @@ static PyObject* PSequence_repr(PSequence* self) {
 
 // {{{ compare
 
-static PyObject* PObj_compare(PyObject* x, PyObject* y, int op) {
+PyObject* PObj_compare(PyObject* x, PyObject* y, int op) {
 	if(x == NULL) {
 		if(y == NULL) switch(op) {
 			case Py_EQ: case Py_GE: case Py_LE:
@@ -2950,7 +2700,7 @@ static PyObject* PObj_compare(PyObject* x, PyObject* y, int op) {
 	assert(false); // LCOV_EXCL_LINE
 }
 
-static PyObject* PIter_compare(PyObject* xs, PyObject* ys, int op) {
+PyObject* PIter_compare(PyObject* xs, PyObject* ys, int op) {
 	PyObject* x = PyIter_Next(xs);
 	if(x == NULL && PyErr_Occurred()) return NULL;
 	PyObject* y = PyIter_Next(ys);
@@ -2965,7 +2715,7 @@ static PyObject* PIter_compare(PyObject* xs, PyObject* ys, int op) {
 	return PIter_compare(xs, ys, op);
 }
 
-static PyObject* PSequence_compare(PyObject* xs, PyObject* ys, int op) {
+PyObject* PSequence_compare(PyObject* xs, PyObject* ys, int op) {
 	if(xs == ys) switch(op) {
 		case Py_EQ: case Py_LE: case Py_GE:
 			return PObj_IncRef(Py_True);
@@ -3005,7 +2755,7 @@ static PyObject* PSequence_compare(PyObject* xs, PyObject* ys, int op) {
 #define _PyHASH_XXROTATE(x) ((x << 13) | (x >> 19))
 #endif
 
-static Py_uhash_t FNode_hash(FNode* node, Py_uhash_t acc) {
+Py_uhash_t FNode_hash(FNode* node, Py_uhash_t acc) {
 	if(node->size == 1) {
 		Py_uhash_t lane = PyObject_Hash(node->value);
 		if (lane == (Py_uhash_t)-1) return -1;
@@ -3020,13 +2770,13 @@ static Py_uhash_t FNode_hash(FNode* node, Py_uhash_t acc) {
 	return FNode_hash(node->items[2], acc);
 }
 
-static Py_uhash_t FDigit_hash(FDigit* digit, Py_uhash_t acc) {
+Py_uhash_t FDigit_hash(FDigit* digit, Py_uhash_t acc) {
 	for(int i = 0; i < digit->count; ++i)
 		if((acc = FNode_hash(digit->items[i], acc)) == (Py_uhash_t)-1) return -1;
 	return acc;
 }
 
-static Py_uhash_t FTree_hash(FTree* tree, Py_uhash_t acc) {
+Py_uhash_t FTree_hash(FTree* tree, Py_uhash_t acc) {
 	switch(tree->type) {
 		case FEmptyT: return acc;
 		case FSingleT: return FNode_hash(tree->single, acc);
@@ -3039,7 +2789,7 @@ static Py_uhash_t FTree_hash(FTree* tree, Py_uhash_t acc) {
 	} // LCOV_EXCL_LINE
 }
 
-static Py_hash_t PSequence_hash(PSequence* self) {
+Py_hash_t PSequence_hash(PSequence* self) {
 	Py_uhash_t acc = FTree_hash(self->tree, _PyHASH_XXPRIME_5);
 	if(acc == (Py_uhash_t)-1) return -1;
 	acc += FTree_ssize(self->tree) ^ (_PyHASH_XXPRIME_5 ^ 3527539UL);
@@ -3051,7 +2801,7 @@ static Py_hash_t PSequence_hash(PSequence* self) {
 
 // {{{ reverse
 
-static FNode* FNode_reverse(FNode* node) {
+FNode* FNode_reverse(FNode* node) {
 	if(node->size == 1) return FNode_incRef(node);
 	if(node->items[2] == NULL)
 		return FNode_make(node->size,
@@ -3063,7 +2813,7 @@ static FNode* FNode_reverse(FNode* node) {
 		FNode_reverse(node->items[0]));
 }
 
-static FDigit* FDigit_reverse(FDigit* digit) {
+FDigit* FDigit_reverse(FDigit* digit) {
 	switch(digit->count) {
 		case 1: return FDigit_make(digit->size, digit->count,
 			FNode_reverse(digit->items[0]), NULL, NULL, NULL);
@@ -3083,7 +2833,7 @@ static FDigit* FDigit_reverse(FDigit* digit) {
 	} // LCOV_EXCL_LINE
 }
 
-static FTree* FTree_reverse(FTree* tree) {
+FTree* FTree_reverse(FTree* tree) {
 	switch(tree->type) {
 		case FEmptyT: return FEmpty_make();
 		case FSingleT: return FSingle_make(
@@ -3096,7 +2846,7 @@ static FTree* FTree_reverse(FTree* tree) {
 	} // LCOV_EXCL_LINE
 }
 
-static PSequence* PSequence_reverse(PSequence* self) {
+PSequence* PSequence_reverse(PSequence* self) {
 	return PSequence_make(FTree_reverse(self->tree));
 }
 
@@ -3104,7 +2854,7 @@ static PSequence* PSequence_reverse(PSequence* self) {
 
 // {{{ getSlice
 
-static bool FNode_getSlice(FNode* node, FSlice* slice) {
+bool FNode_getSlice(FNode* node, FSlice* slice) {
 	if(node->size <= slice->modulo) {
 		slice->modulo -= node->size;
 		return false;
@@ -3124,7 +2874,7 @@ static bool FNode_getSlice(FNode* node, FSlice* slice) {
 	return FNode_getSlice(node->items[2], slice);
 }
 
-static bool FDigit_getSlice(FDigit* digit, FSlice* slice) {
+bool FDigit_getSlice(FDigit* digit, FSlice* slice) {
 	if(digit->size <= slice->modulo) {
 		slice->modulo -= digit->size;
 		return false;
@@ -3135,7 +2885,7 @@ static bool FDigit_getSlice(FDigit* digit, FSlice* slice) {
 	return false;
 }
 
-static bool FTree_getSlice(FTree* tree, FSlice* slice) {
+bool FTree_getSlice(FTree* tree, FSlice* slice) {
 	if(FTree_size(tree) <= slice->modulo) {
 		slice->modulo -= FTree_size(tree);
 		return false;
@@ -3153,7 +2903,7 @@ static bool FTree_getSlice(FTree* tree, FSlice* slice) {
 	} // LCOV_EXCL_LINE
 }
 
-static PSequence* PSequence_getSlice(PSequence* self, PyObject* slice) {
+PSequence* PSequence_getSlice(PSequence* self, PyObject* slice) {
 	Py_ssize_t start, stop, step;
 	if(PySlice_Unpack(slice, &start, &stop, &step)) return NULL;
 	assert(step != 0);
@@ -3195,7 +2945,7 @@ static PSequence* PSequence_getSlice(PSequence* self, PyObject* slice) {
 	return PSequence_make(tree);
 }
 
-static PyObject* PSequence_subscr(PSequence* self, PyObject* arg) {
+PyObject* PSequence_subscr(PSequence* self, PyObject* arg) {
 	if(PyIndex_Check(arg)) {
 		Py_ssize_t index = PyNumber_AsSsize_t(arg, PyExc_IndexError);
 		if(index == -1 && PyErr_Occurred()) return NULL;
@@ -3211,7 +2961,7 @@ static PyObject* PSequence_subscr(PSequence* self, PyObject* arg) {
 
 // {{{ deleteSlice
 
-static PSequence* PSequence_deleteSlice(
+PSequence* PSequence_deleteSlice(
 	PSequence* self,
 	PyObject* slice
 ) {
@@ -3257,7 +3007,7 @@ static PSequence* PSequence_deleteSlice(
 	return PSequence_make(acc);
 }
 
-static PSequence* PSequence_deleteSubscr(PSequence* self, PyObject* index) {
+PSequence* PSequence_deleteSubscr(PSequence* self, PyObject* index) {
 	if(PyIndex_Check(index)) {
 		Py_ssize_t idx = PyNumber_AsSsize_t(index, PyExc_IndexError);
 		if(idx == -1 && PyErr_Occurred()) return NULL;
@@ -3273,7 +3023,7 @@ static PSequence* PSequence_deleteSubscr(PSequence* self, PyObject* index) {
 
 // {{{ setSlice
 
-static FNode* FNode_setSlice(FNode* node, FSlice* slice) {
+FNode* FNode_setSlice(FNode* node, FSlice* slice) {
 	assert(node != NULL);
 	if(slice->count == 0)
 		return FNode_incRef(node);
@@ -3296,7 +3046,7 @@ static FNode* FNode_setSlice(FNode* node, FSlice* slice) {
 	return FNode_make(node->size, nodes[0], nodes[1], nodes[2]);
 }
 
-static FDigit* FDigit_setSlice(FDigit* digit, FSlice* slice) {
+FDigit* FDigit_setSlice(FDigit* digit, FSlice* slice) {
 	if(slice->count == 0)
 		return FDigit_incRef(digit);
 	if(digit->size <= slice->modulo) {
@@ -3309,7 +3059,7 @@ static FDigit* FDigit_setSlice(FDigit* digit, FSlice* slice) {
 	return FDigit_makeN(digit->size, digit->count, nodes);
 }
 
-static FTree* FTree_setSlice(FTree* tree, FSlice* slice) {
+FTree* FTree_setSlice(FTree* tree, FSlice* slice) {
 	if(slice->count == 0)
 		return FTree_incRef(tree);
 	if(FTree_size(tree) <= slice->modulo) {
@@ -3329,7 +3079,7 @@ static FTree* FTree_setSlice(FTree* tree, FSlice* slice) {
 	} // LCOV_EXCL_LINE
 }
 
-static PSequence* PSequence_setSlice(
+PSequence* PSequence_setSlice(
 	PSequence* self,
 	PyObject* slice,
 	PyObject* value
@@ -3385,7 +3135,7 @@ static PSequence* PSequence_setSlice(
 	return PSequence_make(tree);
 }
 
-static PSequence* PSequence_setSubscr(
+PSequence* PSequence_setSubscr(
 	PSequence* self,
 	PyObject* index,
 	PyObject* value
@@ -3401,7 +3151,7 @@ static PSequence* PSequence_setSubscr(
 		"psequence indices must be integers or slices");
 }
 
-static PSequence* PSequence_setSubscrN(PSequence* self, PyObject* args) {
+PSequence* PSequence_setSubscrN(PSequence* self, PyObject* args) {
 	PyObject* index; PyObject* value;
 	if(!PyArg_ParseTuple(args, "OO", &index, &value)) return NULL;
 	return PSequence_setSubscr(self, index, value);
@@ -3411,9 +3161,9 @@ static PSequence* PSequence_setSubscrN(PSequence* self, PyObject* args) {
 
 // {{{ reduce
 
-static PyObject* PSEQUENCE_FUNCTION = NULL;
+PyObject* PSEQUENCE_FUNCTION = NULL;
 
-static PyObject* PSequence_reduce(PSequence* self) {
+PyObject* PSequence_reduce(PSequence* self) {
 	assert(PSEQUENCE_FUNCTION != NULL);
 	return Py_BuildValue("(O(N))", PSEQUENCE_FUNCTION, PSequence_toList(self));
 }
@@ -3422,9 +3172,9 @@ static PyObject* PSequence_reduce(PSequence* self) {
 
 // {{{ transform
 
-static PyObject* TRANSFORM_FUNCTION = NULL;
+PyObject* TRANSFORM_FUNCTION = NULL;
 
-static PSequence* PSequence_transform(PSequence* self, PyObject* args) {
+PSequence* PSequence_transform(PSequence* self, PyObject* args) {
 	if(TRANSFORM_FUNCTION == NULL) {
 		PyObject* module = PyImport_ImportModule("pyrsistent._transformations");
 		if(module == NULL) return NULL;
@@ -3440,7 +3190,7 @@ static PSequence* PSequence_transform(PSequence* self, PyObject* args) {
 
 // {{{ sort
 
-static PSequence* PSequence_sort(
+PSequence* PSequence_sort(
 	PSequence*  self,
 	PyObject* args,
 	PyObject* kwargs
@@ -3463,27 +3213,23 @@ static PSequence* PSequence_sort(
 
 // {{{ PSequence
 
-static Py_ssize_t PSequence_length(PSequence* self) {
+Py_ssize_t PSequence_length(PSequence* self) {
 	return FTree_ssize(self->tree);
 }
 
-static PyObject* PSequence_refcount(PyObject* self, PyObject* args) {
+PyObject* PSequence_refcount(PyObject* self, PyObject* args) {
 	return Py_BuildValue("(lll)",
 		FRefs_get(FTreeR), FRefs_get(FDigitR), FRefs_get(FNodeR));
 }
 
-static PSequence* PSequence_fromItems(PyObject* self, PyObject* args) {
+PSequence* PSequence_fromItems(PyObject* self, PyObject* args) {
 	PyObject* arg = NULL;
 	if(!PyArg_ParseTuple(args, "|O", &arg)) return NULL;
 	if(arg == NULL) return PObj_IncRef(EMPTY_SEQUENCE);
 	return PSequence_fromIterable(arg);
 }
 
-static PSequenceIter* PSequence_iter(PSequence* self);
-static PSequenceIter* PSequence_reversed(PSequence* self);
-static PSequenceEvolver* PSequence_evolver(PSequence* self);
-
-static PySequenceMethods PSequence_asSequence = {
+PySequenceMethods PSequence_asSequence = {
 	.sq_length         = (lenfunc)PSequence_length,
 	.sq_concat         = (binaryfunc)PSequence_extendRight,
 	.sq_repeat         = (ssizeargfunc)PSequence_repeat,
@@ -3494,7 +3240,7 @@ static PySequenceMethods PSequence_asSequence = {
 	.sq_inplace_repeat = (ssizeargfunc)NULL,
 };
 
-static PyMappingMethods PSequence_asMapping = {
+PyMappingMethods PSequence_asMapping = {
 	.mp_length        = (lenfunc)PSequence_length,
 	.mp_subscript     = (binaryfunc)PSequence_subscr,
 	.mp_ass_subscript = (objobjargproc)NULL,
@@ -3502,7 +3248,7 @@ static PyMappingMethods PSequence_asMapping = {
 
 #define define_getter(name, func) \
 	{ #name, (getter)PSequence_##func, NULL, NULL, NULL }
-static PyGetSetDef PSequence_getSet[] = {
+PyGetSetDef PSequence_getSet[] = {
 	// { (const char*)name, (getter)get, (setter)set, (const char*)doc, (void*)closure }
 	define_getter(left, peekLeft),
 	define_getter(right, peekRight),
@@ -3512,7 +3258,7 @@ static PyGetSetDef PSequence_getSet[] = {
 
 #define define_method(name, func, flags) \
 	{ #name, (PyCFunction)PSequence_##func, METH_##flags, NULL }
-static PyMethodDef PSequence_methods[] = {
+PyMethodDef PSequence_methods[] = {
 	define_method(append,       appendRight,  O),
 	define_method(appendright,  appendRight,  O),
 	define_method(appendleft,   appendLeft,   O),
@@ -3547,7 +3293,7 @@ static PyMethodDef PSequence_methods[] = {
 };
 #undef define_method
 
-static PyTypeObject PSequenceType = {
+PyTypeObject PSequenceType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	.tp_name              = (const char*)"pyrsistent_extras._psequence._c_ext.PSequence",
 	.tp_basicsize         = (Py_ssize_t)sizeof(PSequence),
@@ -3603,7 +3349,7 @@ static PyTypeObject PSequenceType = {
 
 // {{{ iter next
 
-static FIter* FIter_pushStack(
+FIter* FIter_pushStack(
 	FIter* iter,
 	FIterT type,
 	int index,
@@ -3612,7 +3358,7 @@ static FIter* FIter_pushStack(
 	return FIter_make(type, index, item, iter);
 }
 
-static FIter* FIter_swapStack(
+FIter* FIter_swapStack(
 	FIter* iter,
 	FIterT type,
 	int index,
@@ -3626,14 +3372,14 @@ static FIter* FIter_swapStack(
 	return iter;
 }
 
-static FIter* FIter_popStack(FIter* iter) {
+FIter* FIter_popStack(FIter* iter) {
 	assert(iter != NULL);
 	FIter* next = iter->next;
 	FIter_dealloc(iter, false);
 	return next;
 }
 
-static FIter* FIter_nextStack(FIter* iter) {
+FIter* FIter_nextStack(FIter* iter) {
 	if(iter == NULL) return iter;
 	switch(iter->type) {
 		case FTreeI:
@@ -3680,7 +3426,7 @@ static FIter* FIter_nextStack(FIter* iter) {
 	} // LCOV_EXCL_LINE
 }
 
-static FIter* FIter_prevStack(FIter* iter) {
+FIter* FIter_prevStack(FIter* iter) {
 	if(iter == NULL) return iter;
 	switch(iter->type) {
 		case FTreeI:
@@ -3749,7 +3495,7 @@ static FIter* FIter_prevStack(FIter* iter) {
 	} // LCOV_EXCL_LINE
 }
 
-static PyObject* PSequenceIter_next(PSequenceIter* self) {
+PyObject* PSequenceIter_next(PSequenceIter* self) {
 	if(self->reverse)
 		self->stack = FIter_prevStack(self->stack);
 	else
@@ -3778,13 +3524,13 @@ static PyObject* PSequenceIter_next(PSequenceIter* self) {
 
 // {{{ PSequenceIter
 
-static PSequenceIter* PSequence_iter(PSequence* self) {
+PSequenceIter* PSequence_iter(PSequence* self) {
 	return PSequenceIter_make(
 		0, false, PObj_IncRef(self),
 		FIter_make(FTreeI, 0, self->tree, NULL));
 }
 
-static PSequenceIter* PSequence_reversed(PSequence* self) {
+PSequenceIter* PSequence_reversed(PSequence* self) {
 	int index;
 	switch(self->tree->type) {
 		case FEmptyT: index = 0; break;
@@ -3797,12 +3543,12 @@ static PSequenceIter* PSequence_reversed(PSequence* self) {
 		FIter_make(FTreeI, index, self->tree, NULL));
 }
 
-static PyObject* PSequenceIter_lenHint(PSequenceIter* self) {
+PyObject* PSequenceIter_lenHint(PSequenceIter* self) {
 	return PyLong_FromSsize_t(self->reverse ? self->index
 		: FTree_ssize(self->seq->tree) - self->index);
 }
 
-static int PSequenceIter_traverse(
+int PSequenceIter_traverse(
 	PSequenceIter *self,
 	visitproc visit,
 	void* arg
@@ -3812,13 +3558,13 @@ static int PSequenceIter_traverse(
 
 #define define_method(name, method, flags) \
 	{ #name, (PyCFunction)PSequenceIter_##method, METH_##flags, NULL }
-static PyMethodDef PSequenceIter_methods[] = {
+PyMethodDef PSequenceIter_methods[] = {
 	define_method(__length_hint__, lenHint, NOARGS),
 	{NULL}
 };
 #undef define_method
 
-static PyTypeObject PSequenceIterType = {
+PyTypeObject PSequenceIterType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	.tp_name              = (const char*)"pyrsistent_extras._psequence._c_ext.Iterator",
 	.tp_basicsize         = (Py_ssize_t)sizeof(PSequenceIter),
@@ -3875,45 +3621,45 @@ static PyTypeObject PSequenceIterType = {
 // {{{ evolver inherit
 
 #define inherit_query0(name, rettype) \
-	static rettype PSequenceEvolver_##name \
+	rettype PSequenceEvolver_##name \
 	(PSequenceEvolver* self) \
 	{ return PSequence_##name(self->seq); }
 #define inherit_query1(name, rettype, type1) \
-	static rettype PSequenceEvolver_##name \
+	rettype PSequenceEvolver_##name \
 	(PSequenceEvolver* self, type1 arg1) \
 	{ return PSequence_##name(self->seq, arg1); }
 #define inherit_query2(name, rettype, type1, type2) \
-	static rettype PSequenceEvolver_##name \
+	rettype PSequenceEvolver_##name \
 	(PSequenceEvolver* self, type1 arg1, type2 arg2) \
 	{ return PSequence_##name(self->seq, arg1, arg2); }
 
 #define inherit_method0(name) \
-	static PSequenceEvolver* PSequenceEvolver_##name \
+	PSequenceEvolver* PSequenceEvolver_##name \
 	(PSequenceEvolver* self) \
 	{ PSequence* seq = PSequence_##name(self->seq); \
 		if(seq == NULL) return NULL; \
 		Py_DECREF(self->seq); self->seq = seq; return PObj_IncRef(self); }
 #define inherit_method1(name, type1) \
-	static PSequenceEvolver* PSequenceEvolver_##name \
+	PSequenceEvolver* PSequenceEvolver_##name \
 	(PSequenceEvolver* self, type1 arg1) \
 	{ PSequence* seq = PSequence_##name(self->seq, arg1); \
 		if(seq == NULL) return NULL; \
 		Py_DECREF(self->seq); self->seq = seq; return PObj_IncRef(self); }
 #define inherit_method2(name, type1, type2) \
-	static PSequenceEvolver* PSequenceEvolver_##name \
+	PSequenceEvolver* PSequenceEvolver_##name \
 	(PSequenceEvolver* self, type1 arg1, type2 arg2) \
 	{ PSequence* seq = PSequence_##name(self->seq, arg1, arg2); \
 		if(seq == NULL) return NULL; \
 		Py_DECREF(self->seq); self->seq = seq; return PObj_IncRef(self); }
 #define inherit_methodN(name) \
-	static PSequenceEvolver* PSequenceEvolver_##name \
+	PSequenceEvolver* PSequenceEvolver_##name \
 	(PSequenceEvolver* self, PyObject* args) \
 	{ PSequence* seq = PSequence_##name(self->seq, args); \
 		if(seq == NULL) return NULL; \
 		Py_DECREF(self->seq); self->seq = seq; return PObj_IncRef(self); }
 
 #define inherit_new1(name, type1) \
-	static PSequenceEvolver* PSequenceEvolver_##name##New \
+	PSequenceEvolver* PSequenceEvolver_##name##New \
 	(PSequenceEvolver* self, type1 arg1) \
 	{ PSequence* seq = PSequence_##name(self->seq, arg1); \
 		if(seq == NULL) return NULL; \
@@ -3970,6 +3716,7 @@ inherit_methodN(transform)
 #undef inherit_query2
 #undef inherit_method0
 #undef inherit_method1
+#undef inherit_method2
 #undef inherit_methodN
 #undef inherit_new1
 
@@ -3977,7 +3724,7 @@ inherit_methodN(transform)
 
 // {{{ pop
 
-static PyObject* PSequenceEvolver_popLeft(PSequenceEvolver* self) {
+PyObject* PSequenceEvolver_popLeft(PSequenceEvolver* self) {
 	if(FTree_empty(self->seq->tree))
 		return (void*)PyErr_Format(PyExc_IndexError,
 			"pop from empty sequence");
@@ -3989,7 +3736,7 @@ static PyObject* PSequenceEvolver_popLeft(PSequenceEvolver* self) {
 	return value;
 }
 
-static PyObject* PSequenceEvolver_popRight(PSequenceEvolver* self) {
+PyObject* PSequenceEvolver_popRight(PSequenceEvolver* self) {
 	if(FTree_empty(self->seq->tree))
 		return (void*)PyErr_Format(PyExc_IndexError,
 			"pop from empty sequence");
@@ -4001,7 +3748,7 @@ static PyObject* PSequenceEvolver_popRight(PSequenceEvolver* self) {
 	return value;
 }
 
-static PyObject* PSequenceEvolver_pop(PSequenceEvolver* self, PyObject* args) {
+PyObject* PSequenceEvolver_pop(PSequenceEvolver* self, PyObject* args) {
 	PyObject* arg = NULL;
 	if(!PyArg_ParseTuple(args, "|O", &arg)) return NULL;
 	if(arg == NULL) return PSequenceEvolver_popRight(self);
@@ -4017,11 +3764,11 @@ static PyObject* PSequenceEvolver_pop(PSequenceEvolver* self, PyObject* args) {
 
 // {{{ PSequenceEvolver
 
-static PSequenceEvolver* PSequence_evolver(PSequence* self) {
+PSequenceEvolver* PSequence_evolver(PSequence* self) {
 	return PSequenceEvolver_make(PObj_IncRef(self));
 }
 
-static PyObject* PSequenceEvolver_repr(PSequenceEvolver* self) {
+PyObject* PSequenceEvolver_repr(PSequenceEvolver* self) {
 	PyObject* list = PSequence_toList(self->seq);
 	if(list == NULL) return NULL;
 	PyObject* repr = PyObject_Repr(list);
@@ -4033,21 +3780,21 @@ static PyObject* PSequenceEvolver_repr(PSequenceEvolver* self) {
 	return form;
 }
 
-static PSequence* PSequenceEvolver_persistent(PSequenceEvolver* self) {
+PSequence* PSequenceEvolver_persistent(PSequenceEvolver* self) {
 	return PObj_IncRef(self->seq);
 }
 
-static PSequenceEvolver* PSequenceEvolver_copy(PSequenceEvolver* self) {
+PSequenceEvolver* PSequenceEvolver_copy(PSequenceEvolver* self) {
 	return PSequenceEvolver_make(PObj_IncRef(self->seq));
 }
 
-static PSequenceEvolver* PSequenceEvolver_clear(PSequenceEvolver* self) {
+PSequenceEvolver* PSequenceEvolver_clear(PSequenceEvolver* self) {
 	Py_DECREF(self->seq);
 	self->seq = PObj_IncRef(EMPTY_SEQUENCE);
 	return PObj_IncRef(Py_None);
 }
 
-static int PSequenceEvolver_assItem(
+int PSequenceEvolver_assItem(
 	PSequenceEvolver* self,
 	Py_ssize_t index,
 	PyObject* value
@@ -4063,7 +3810,7 @@ static int PSequenceEvolver_assItem(
 	return 0;
 }
 
-static int PSequenceEvolver_assSubscr(
+int PSequenceEvolver_assSubscr(
 	PSequenceEvolver* self,
 	PyObject* index,
 	PyObject* value
@@ -4081,7 +3828,7 @@ static int PSequenceEvolver_assSubscr(
 
 #define define_getter(name, func) \
 	{ #name, (getter)PSequenceEvolver_##func, NULL, NULL, NULL }
-static PyGetSetDef PSequenceEvolver_getSet[] = {
+PyGetSetDef PSequenceEvolver_getSet[] = {
 	// { (const char*)name, (getter)get, (setter)set, (const char*)doc, (void*)closure }
 	define_getter(left, peekLeft),
 	define_getter(right, peekRight),
@@ -4091,7 +3838,7 @@ static PyGetSetDef PSequenceEvolver_getSet[] = {
 
 #define define_method(name, method, flags) \
 	{ #name, (PyCFunction)PSequenceEvolver_##method, METH_##flags, NULL }
-static PyMethodDef PSequenceEvolver_methods[] = {
+PyMethodDef PSequenceEvolver_methods[] = {
 	define_method(append,       appendRight,  O),
 	define_method(appendright,  appendRight,  O),
 	define_method(appendleft,   appendLeft,   O),
@@ -4128,7 +3875,7 @@ static PyMethodDef PSequenceEvolver_methods[] = {
 };
 #undef define_method
 
-static PySequenceMethods PSequenceEvolver_asSequence = {
+PySequenceMethods PSequenceEvolver_asSequence = {
 	.sq_length         = (lenfunc)PSequenceEvolver_length,
 	.sq_concat         = (binaryfunc)PSequenceEvolver_extendRightNew,
 	.sq_repeat         = (ssizeargfunc)PSequenceEvolver_repeatNew,
@@ -4139,13 +3886,13 @@ static PySequenceMethods PSequenceEvolver_asSequence = {
 	.sq_inplace_repeat = (ssizeargfunc)PSequenceEvolver_repeat,
 };
 
-static PyMappingMethods PSequenceEvolver_asMapping = {
+PyMappingMethods PSequenceEvolver_asMapping = {
 	.mp_length        = (lenfunc)PSequenceEvolver_length,
 	.mp_subscript     = (binaryfunc)PSequenceEvolver_subscr,
 	.mp_ass_subscript = (objobjargproc)PSequenceEvolver_assSubscr,
 };
 
-static PyTypeObject PSequenceEvolverType = {
+PyTypeObject PSequenceEvolverType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	.tp_name              = (const char*)"pyrsistent_extras._psequence._c_ext.Iterator",
 	.tp_basicsize         = (Py_ssize_t)sizeof(PSequenceEvolver),
@@ -4201,7 +3948,7 @@ static PyTypeObject PSequenceEvolverType = {
 
 // {{{ module def
 
-static struct PyModuleDef moduleDef = {
+struct PyModuleDef moduleDef = {
 	PyModuleDef_HEAD_INIT,
 	.m_name     = (const char*)"pyrsistent_extras._psequence._c_ext",
 	.m_doc      = (const char*)"persistent sequence c implementation",
