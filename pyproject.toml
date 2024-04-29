@@ -9,7 +9,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pyrsistent_extras"
-version = "0.1.0"
+version = "0.1.1"
 description = "Extra data structures for pyrsistent"
 readme = "README.rst"
 license = { file = "LICENSE.mit" }
