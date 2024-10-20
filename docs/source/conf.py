@@ -1,5 +1,5 @@
 project          = 'pyrsistent-extras'
-copyright        = '2022, mingmingrr'
+copyright        = '2024, mingmingrr'
 author           = 'mingmingrr'
 templates_path   = ['_templates']
 exclude_patterns = []
@@ -10,10 +10,11 @@ extensions = [
 	'sphinx.ext.mathjax',
 	'sphinx.ext.intersphinx',
 	'sphinx.ext.viewcode',
-	#  'sphinx_autodoc_typehints',
+	'sphinx_autodoc_typehints',
 ]
 
 autodoc_typehints = 'both'
+autodoc_docstring_signature = True
 
 intersphinx_mapping = {
 	'python': ('https://docs.python.org/3', None),
@@ -26,8 +27,4 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 import builtins
 builtins.__sphinx_build__ = True
-
-import sys
-import os
-sys.path.insert(0, os.path.abspath('../..'))
 

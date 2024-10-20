@@ -56,7 +56,7 @@ NB_MODULE(_psequence, mod) {
 			- slicing a continguous chunk is :math:`O(\log{n})`
 			- merging two sequences is :math:`O(\log{n})`
 			- repeating a sequence :math:`k` times is :math:`O(\log{k}\log{n})`
-				and takes :math:`O(\log{k}\log{n})` space
+			  and takes :math:`O(\log{k}\log{n})` additional space
 
 		The implementation uses 2-3 finger trees annotated with sizes
 		based on Haskell's `Data.Sequence <https://hackage.haskell.org/package/
