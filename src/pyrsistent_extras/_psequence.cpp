@@ -19,7 +19,7 @@ using namespace nb::literals;
 std::ostream& operator <<(std::ostream& out, const nb::handle x)
 	{ return out << nb::repr(x).c_str(); }
 
-#include "_cpp_ext.hpp"
+#include "_psequence.hpp"
 #include "_utility.hpp"
 #include "_nanobind.hpp"
 
@@ -30,7 +30,7 @@ using Sequence = pyr::Sequence<nb::object>;
 
 struct Evolver { Sequence seq; };
 
-NB_MODULE(_cpp_ext, mod) {
+NB_MODULE(_psequence, mod) {
 	mod.attr("T") = nb::type_var("T");
 	mod.attr("IndexLike") = "typing.Union[int,slice]";
 

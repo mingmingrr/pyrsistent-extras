@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List
 
-from pyrsistent_extras._psequence._cpp_ext import psequence, PSequence, sq, PSequenceEvolver
+from pyrsistent_extras._psequence import psequence, PSequence, sq, PSequenceEvolver
 import pyrsistent_extras.lenses
 
 from hypothesis import given, strategies as st

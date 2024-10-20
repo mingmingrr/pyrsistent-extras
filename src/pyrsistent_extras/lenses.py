@@ -6,7 +6,6 @@ from ._utility import Comparable
 
 from ._pheap import PMinHeap, pminheap, PMaxHeap, pmaxheap
 from ._psequence import PSequence, psequence
-from ._psequence import _cpp_ext as cpp
 
 from lenses import hooks
 
@@ -26,19 +25,6 @@ def _psequence_contains_remove(self:PSequence[T], item:T) -> PSequence[T]:
 @hooks.from_iter.register(PSequence)
 def _psequence_from_iter(self:PSequence[T], items:Iterator[T]) -> PSequence[T]:
 	return psequence(items)
-
-@hooks.setitem.register(cpp.PSequence)
-def _psequence_cpp_setitem(self:cpp.PSequence[T], index:int, value:T) -> cpp.PSequence[T]:
-	return self.set(index, value)
-@hooks.contains_add.register(cpp.PSequence)
-def _psequence_cpp_contains_add(self:cpp.PSequence[T], item:T) -> cpp.PSequence[T]:
-	return self.append(item)
-@hooks.contains_remove.register(cpp.PSequence)
-def _psequence_cpp_contains_remove(self:cpp.PSequence[T], item:T) -> cpp.PSequence[T]:
-	return cpp.psequence(i for i in self if item != i)
-@hooks.from_iter.register(cpp.PSequence)
-def _psequence_cpp_from_iter(self:cpp.PSequence[T], items:Iterator[T]) -> cpp.PSequence[T]:
-	return cpp.psequence(items)
 
 @hooks.contains_add.register(PMinHeap)
 def _pminheap_contains_add(self:PMinHeap[K,None], key:K) -> PMinHeap[K,None]:

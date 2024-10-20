@@ -5,7 +5,7 @@
 #include <vector>
 #include <algorithm>
 
-#include "_psequence/_cpp_ext.hpp"
+#include "_psequence.hpp"
 
 namespace pyr = pyrsistent;
 

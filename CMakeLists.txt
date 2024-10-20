@@ -13,32 +13,25 @@ find_package(Python 3.7
 	OPTIONAL_COMPONENTS Development.SABIModule)
 find_package(nanobind CONFIG REQUIRED)
 
-python_add_library(psequence_c MODULE
-	src/pyrsistent_extras/_psequence/_c_ext.c WITH_SOABI)
-set_target_properties(psequence_c
-	PROPERTIES OUTPUT_NAME _c_ext)
-install(TARGETS psequence_c
-	LIBRARY DESTINATION pyrsistent_extras/_psequence)
-
-nanobind_add_module(psequence_cpp
+nanobind_add_module(psequence
 	NOMINSIZE LTO STABLE_ABI
-	src/pyrsistent_extras/_psequence/_cpp_ext.cpp)
-target_include_directories(psequence_cpp
+	src/pyrsistent_extras/_psequence.cpp)
+target_include_directories(psequence
 	PRIVATE src/pyrsistent_extras)
-set_target_properties(psequence_cpp
-	PROPERTIES OUTPUT_NAME _cpp_ext)
-install(TARGETS psequence_cpp
-	LIBRARY DESTINATION pyrsistent_extras/_psequence)
+set_target_properties(psequence
+	PROPERTIES OUTPUT_NAME _psequence)
+install(TARGETS psequence
+	LIBRARY DESTINATION pyrsistent_extras)
 
 option(BUILD_STUBS "Generate Python type stubs" ON)
 if(BUILD_STUBS)
 	nanobind_add_stub(
-		psequence_cpp_stub
+		psequence_stub
 		INSTALL_TIME
-		MODULE pyrsistent_extras._psequence._cpp_ext
-		OUTPUT pyrsistent_extras/_psequence/_cpp_ext.pyi
-		PYTHON_PATH $<TARGET_FILE_DIR:psequence_cpp>
-		DEPENDS psequence_cpp)
+		MODULE pyrsistent_extras._psequence
+		OUTPUT pyrsistent_extras/_psequence.pyi
+		PYTHON_PATH $<TARGET_FILE_DIR:psequence>
+		DEPENDS psequence)
 endif()
 
 option(BUILD_TESTS "Build with rapidcheck tests" OFF)
