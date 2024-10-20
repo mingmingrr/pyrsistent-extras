@@ -685,7 +685,7 @@ NB_MODULE(_psequence, mod) {
 	cls.def("tolist", [](const Sequence& seq) {
 		PyObject* xs = PyList_New(seq.size());
 		size_t n = 0; for(auto x: seq)
-			PyList_SET_ITEM(xs, n++, x.inc_ref().ptr());
+			PyList_SetItem(xs, n++, x.inc_ref().ptr());
 		return nb::steal(xs);
 	}, R"(
 		Convert the sequence to a :class:`python:list`
@@ -699,7 +699,7 @@ NB_MODULE(_psequence, mod) {
 	cls.def("totuple", [](const Sequence& seq) {
 		PyObject* xs = PyTuple_New(seq.size());
 		size_t n = 0; for(auto x: seq)
-			PyTuple_SET_ITEM(xs, n++, x.inc_ref().ptr());
+			PyTuple_SetItem(xs, n++, x.inc_ref().ptr());
 		return nb::steal(xs);
 	}, R"(
 		Convert the sequence to a :class:`python:tuple`
