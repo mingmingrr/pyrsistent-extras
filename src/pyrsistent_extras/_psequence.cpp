@@ -971,9 +971,9 @@ NB_MODULE(_psequence, mod) {
 
 	evo.def("pop", []() { throw nb::next_overload(); },
 		nb::sig("def pop(self, index:int) -> T"));
-	evo.def("pop", [](Evolver& evo, nb::object index) {
-		nb::object value = nb::cast(evo.seq).attr("__getitem__")(index);
-		nb::cast(evo).attr("__delitem__")(index);
+	evo.def("pop", [](nb::object evo, nb::object index) {
+		nb::object value = evo.attr("__getitem__")(index);
+		evo.attr("__delitem__")(index);
 		return value;
 	}, "index"_a = -1, R"(
 		Remove and return an element at the specified index
@@ -993,9 +993,6 @@ NB_MODULE(_psequence, mod) {
 		psequence([1, 3]).evolver()
 	)", nb::sig("def pop(self, index:slice) -> PSequenceEvolver[T]"));
 
-	// def __setitem__(self, index: int, value: T) -> PSequenceEvolver[T]:
-	// def __delitem__(self, index: int) -> PSequenceEvolver[T]:
-	// def __getitem__(self, index: int) -> T:
 	abc.attr("MutableSequence").attr("register")(evo);
 	cls.attr("count") = abc.attr("MutableSequence").attr("count");
 	cls.attr("__contains__") = abc.attr("MutableSequence").attr("__contains__");
