@@ -102,7 +102,14 @@ pass_env =
 	HYPOTHESIS_PROFILE
 	NIX_LD
 	NIX_LD_LIBRARY_PATH
+set_env =
+	SKBUILD_BUILD_DIR={temp_dir}/build
+	SKBUILD_CMAKE_BUILD_TYPE=Debug
+	SKBUILD_CMAKE_DEFINE=BUILD_COVERAGE=ON;BUILD_TESTS=ON
 commands =
-	{envpython} -m pytest {env_site_packages_dir}/pyrsistent_extras {toxinidir}/tests
+	{temp_dir}/build/pyrsistent_tests
+	{env_python} -m pytest {env_site_packages_dir}/pyrsistent_extras {tox_root}/tests
 extras = test
+allowlist_externals =
+	{temp_dir}/build/pyrsistent_tests
 """
