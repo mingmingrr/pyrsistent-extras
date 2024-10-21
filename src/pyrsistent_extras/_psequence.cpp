@@ -877,7 +877,7 @@ NB_MODULE(_psequence, mod) {
 		auto [ func, doc, sig ] = pyr_nb::inherit_docstring(
 			cls, name, evo, name, "Alias", "(self) -> T");
 		evo.def_prop_ro(name, [name](Evolver& evo) {
-			return nb::cast(evo.seq).attr(name);
+			return (nb::object)nb::cast(evo.seq).attr(name);
 		}, doc.c_str(), nb::sig(sig.c_str()));
 	}
 
