@@ -682,11 +682,8 @@ NB_MODULE(_psequence, mod) {
 		psequence([4, 3, 2, 1])
 	)", nb::sig("def reverse(self) -> PSequence[T]"));
 
-	cls.def("tolist", [](const Sequence& seq) {
-		PyObject* xs = PyList_New(seq.size());
-		size_t n = 0; for(auto x: seq)
-			PyList_SetItem(xs, n++, x.inc_ref().ptr());
-		return nb::steal(xs);
+	cls.def("tolist", [](nb::object self) {
+		return nb::list(self);
 	}, R"(
 		Convert the sequence to a :class:`python:list`
 
@@ -696,11 +693,8 @@ NB_MODULE(_psequence, mod) {
 		[1, 2, 3, 4]
 	)", nb::sig("def tolist(self) -> typing.List[T]"));
 
-	cls.def("totuple", [](const Sequence& seq) {
-		PyObject* xs = PyTuple_New(seq.size());
-		size_t n = 0; for(auto x: seq)
-			PyTuple_SetItem(xs, n++, x.inc_ref().ptr());
-		return nb::steal(xs);
+	cls.def("totuple", [](nb::object self) {
+		return nb::tuple(self);
 	}, R"(
 		Convert the sequence to a :class:`python:tuple`
 
@@ -1002,7 +996,6 @@ NB_MODULE(_psequence, mod) {
 	// def __setitem__(self, index: int, value: T) -> PSequenceEvolver[T]:
 	// def __delitem__(self, index: int) -> PSequenceEvolver[T]:
 	// def __getitem__(self, index: int) -> T:
-
 	abc.attr("MutableSequence").attr("register")(evo);
 	cls.attr("count") = abc.attr("MutableSequence").attr("count");
 	cls.attr("__contains__") = abc.attr("MutableSequence").attr("__contains__");
