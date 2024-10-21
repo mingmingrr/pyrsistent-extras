@@ -1,15 +1,22 @@
 from __future__ import annotations
 from typing import List
 
+from pyrsistent_extras import _psequence as module
 from pyrsistent_extras._psequence import psequence, PSequence, sq, PSequenceEvolver
 import pyrsistent_extras.lenses
 
 from hypothesis import given, strategies as st
 
+import doctest
 import operator
 import pickle
 import pytest
 from lenses import lens
+
+def test_doctest():
+	flags = doctest.ELLIPSIS | doctest.IGNORE_EXCEPTION_DETAIL
+	fails, tests = doctest.testmod(module, optionflags=flags)
+	assert fails == 0
 
 @given(st.lists(st.integers()))
 def test_properties(items:List[int]):
