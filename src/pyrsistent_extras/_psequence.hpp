@@ -8,6 +8,7 @@
 #include <sstream>
 #include <tuple>
 #include <cassert>
+#include <cstdint>
 #include <stdexcept>
 
 #include "_plist.hpp"
@@ -1572,7 +1573,7 @@ struct Sequence {
 		// if(this->size() != that.size()) return false;
 		return equal_iterator<decltype(this->begin()), decltype(that.begin()), Equal>
 			(this->begin(), this->end(), that.begin(), that.end());
-; }
+	}
 	template<typename Container, typename Equal=std::equal_to<Value>>
 	constexpr bool operator !=(const Container& that) const
 		{ return !this->template operator == <Container, Equal>(that); }
