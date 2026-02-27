@@ -113,3 +113,9 @@ extras = test
 allowlist_externals =
 	{temp_dir}/build/pyrsistent_tests
 """
+
+[tool.pyright]
+strict = ["src", "tests"]
+include = ["src", "tests"]
+exclude = ["**/__pycache__"]
+# stubPath = "stubs"
