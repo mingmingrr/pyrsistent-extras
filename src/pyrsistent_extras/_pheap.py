@@ -1,11 +1,12 @@
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 from typing import Collection, Iterable, Iterator, Hashable, ClassVar, \
-	TypeVar, Generic, Optional, Callable, Tuple, Any, Union, cast, overload
+	TypeVar, Generic, Optional, Tuple, Any, Union, cast, overload
 from abc import abstractmethod
 
 import itertools
 import operator
-import builtins
 
 from ._utility import Comparable, compare_next, compare_iter, sphinx_build
 
@@ -73,8 +74,8 @@ class Forest(Generic[K,V]):
 			return Forest(order, tree, self)
 		if order > self._order:
 			return Forest(self._order, self._tree,
-				Forest.push(self._next, down, order, tree))
-		return Forest.push(self._next, down, order + 1,
+				Forest[K,V].push(self._next, down, order, tree))
+		return Forest[K,V].push(self._next, down, order + 1,
 			self._tree.merge(tree, down))
 
 	def popbranch(self:Forest[K,V], down:bool) \
@@ -90,16 +91,16 @@ class Forest(Generic[K,V]):
 		while order >= self._order:
 			assert branch is not None
 			tree = Tree(branch._key, branch._value, branch._child, None)
-			forest = Forest.push(forest, down, order, tree)
+			forest = Forest[K,V].push(forest, down, order, tree)
 			order, branch = order - 1, branch._sibling
 		return order, branch, key, value, \
-			Forest.push(forest, down, self._order, self._tree)
+			Forest[K,V].push(forest, down, self._order, self._tree)
 
 	def pop(self:Forest[K,V], down:bool) -> Tuple[K,V,Optional[Forest[K,V]]]:
 		order, branch, key, value, forest = self.popbranch(down)
 		while branch is not None:
 			tree = Tree(branch._key, branch._value, branch._child, None)
-			forest = Forest.push(forest, down, order, tree)
+			forest = Forest[K,V].push(forest, down, order, tree)
 			order, branch = order - 1, branch._sibling
 		return key, value, forest
 
@@ -109,12 +110,12 @@ class Forest(Generic[K,V]):
 		if other is None: return self
 		if self._order < other._order:
 			return Forest(self._order, self._tree,
-				Forest.merge(self._next, other, down))
+				Forest[K,V].merge(self._next, other, down))
 		if self._order > other._order:
 			return Forest(other._order, other._tree,
-				Forest.merge(other._next, self, down))
-		forest = Forest.merge(self._next, other._next, down)
-		return Forest.push(forest, down, self._order + 1,
+				Forest[K,V].merge(other._next, self, down))
+		forest = Forest[K,V].merge(self._next, other._next, down)
+		return Forest[K,V].push(forest, down, self._order + 1,
 			self._tree.merge(other._tree, down))
 
 class PHeapView(Generic[K,V,T], Collection[T]):
@@ -206,11 +207,11 @@ class PHeapView(Generic[K,V,T], Collection[T]):
 
 class PHeapKeys(PHeapView[K,V,K]):
 	def __iter__(self) -> Iterator[K]:
-		return (k for k, v in super()._iter())
+		return (k for k, _ in super()._iter())
 
 class PHeapValues(PHeapView[K,V,V]):
 	def __iter__(self) -> Iterator[V]:
-		return (v for k, v in super()._iter())
+		return (v for _, v in super()._iter())
 
 class PHeapItems(PHeapView[K,V,Tuple[K,V]]):
 	def __iter__(self) -> Iterator[Tuple[K,V]]:
@@ -267,7 +268,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 	_down: ClassVar[bool] = cast(Any, None)
 	_empty: ClassVar[PHeap[Any,Any]] = cast(Any, None)
 
-	def __new__(cls, _size, _key, _value, _forest):
+	def __new__(cls, _size:int, _key:K, _value:V, _forest:Optional[Forest[K,V]]):
 		self = super().__new__(cls)
 		self._size = _size
 		self._key = _key
@@ -279,7 +280,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 	def push(self:PHeap[K,None], key:K) -> PHeap[K,None]: ...
 	@overload
 	def push(self:PHeap[K,V], key:K, value:V) -> PHeap[K,V]: ...
-	def push(self, key, value=None):
+	def push(self, key:K, value:Optional[V]=None) -> Union[PHeap[K,V], PHeap[K,None]]:
 		r'''
 		Inserts a value with the specified key
 
@@ -297,7 +298,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 		else:
 			k2, v2, k1, v1 = key, value, self._key, self._value
 		return type(self)(self._size + 1, k1, v1,
-			Forest.push(self._forest, self._down, 0, Tree(k2, v2, None, None)))
+			Forest[K,V].push(self._forest, self._down, 0, Tree(k2, v2, None, None)))
 
 	def pop(self) -> Tuple[K,V,PHeap[K,V]]:
 		r'''
@@ -340,8 +341,8 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 		if other._size == 0: return self
 		if (self._key < other._key) == self._down:
 			self, other = other, self
-		forest = Forest.merge(self._forest, other._forest, self._down)
-		forest = Forest.push(forest, self._down, 0,
+		forest = Forest[K,V].merge(self._forest, other._forest, self._down)
+		forest = Forest[K,V].push(forest, self._down, 0,
 			Tree(other._key, other._value, None, None))
 		return type(self)(self._size + other._size, self._key, self._value, forest)
 
@@ -473,7 +474,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 			return cls._fromitems(items.items(sorted=False))
 		size, forest = 0, None
 		for key, value in items:
-			forest = Forest.push(forest, cls._down, 0,
+			forest = Forest[K,V].push(forest, cls._down, 0,
 				Tree(key, value, None, None))
 			size += 1
 		if forest is None:
@@ -488,9 +489,10 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 	def _iter_group_values(self) -> Iterator[Tuple[K,Iterator[Tuple[K,V]]]]:
 		return itertools.groupby(self.items(), key=operator.itemgetter(0))
 
-	def _compare(self, other:PHeap[K,V], equality:bool) -> int:
+	def _compare(self, other:Any, equality:bool) -> int:
 		if not isinstance(other, PHeap):
 			return NotImplemented
+		other = cast(PHeap[K,V], other)
 		if self._down != other._down:
 			return NotImplemented
 		if equality:
@@ -501,7 +503,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 		try:
 			return compare_iter(self._iter_sort_values(),
 				other._iter_sort_values(), equality)
-		except TypeError as err:
+		except TypeError:
 			if not equality: raise
 		xiter = self._iter_group_values()
 		yiter = other._iter_group_values()
@@ -519,7 +521,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 					return 1
 			assert not yvalues
 
-	def __eq__(self, other) -> bool:
+	def __eq__(self, other:Any) -> bool:
 		r'''
 		Return self == other
 
@@ -538,7 +540,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 		if result is NotImplemented: return NotImplemented
 		return result == 0
 
-	def __ne__(self, other) -> bool:
+	def __ne__(self, other:Any) -> bool:
 		r'''
 		Return self != other
 
@@ -557,7 +559,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 		if result is NotImplemented: return NotImplemented
 		return result != 0
 
-	def __gt__(self, other) -> bool:
+	def __gt__(self, other:Any) -> bool:
 		r'''
 		Return self > other
 
@@ -577,7 +579,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 		if result is NotImplemented: return NotImplemented
 		return result > 0
 
-	def __ge__(self, other) -> bool:
+	def __ge__(self, other:Any) -> bool:
 		r'''
 		Return self >= other
 
@@ -597,7 +599,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 		if result is NotImplemented: return NotImplemented
 		return result >= 0
 
-	def __lt__(self, other) -> bool:
+	def __lt__(self, other:Any) -> bool:
 		r'''
 		Return self < other
 
@@ -617,7 +619,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 		if result is NotImplemented: return NotImplemented
 		return result < 0
 
-	def __le__(self, other) -> bool:
+	def __le__(self, other:Any) -> bool:
 		r'''
 		Return self <= other
 
