@@ -227,7 +227,7 @@ NB_MODULE(_psequence, mod) {
 		Traceback (most recent call last):
 		...
 		ValueError: ...
-	)", nb::sig("def index(self, value, start:int=0, stop:typing.Optional[int]=None) -> int"));
+	)", nb::sig("def index(self, value:T, start:int=0, stop:typing.Optional[int]=None) -> int"));
 
 	cls.def("__getitem__", [](const Sequence& seq, Py_ssize_t index) {
 		return seq.at(pyr::adjust_index<Py_ssize_t>(seq.size(), index));
@@ -610,7 +610,7 @@ NB_MODULE(_psequence, mod) {
 		Traceback (most recent call last):
 		...
 		IndexError: ...
-	)", nb::sig("def viewleft(self) -> typing.Tuple[PSequence, T]"));
+	)", nb::sig("def viewleft(self) -> typing.Tuple[PSequence[T], T]"));
 
 	cls.def("viewright", &Sequence::view_back, R"(
 		Analyse the right end
@@ -625,7 +625,7 @@ NB_MODULE(_psequence, mod) {
 		Traceback (most recent call last):
 		...
 		IndexError: ...
-	)", nb::sig("def viewright(self) -> typing.Tuple[T, PSequence]"));
+	)", nb::sig("def viewright(self) -> typing.Tuple[T, PSequence[T]]"));
 
 	cls.def("view", [](Sequence seq, const nb::args& args) {
 		nb::list views;
@@ -671,7 +671,7 @@ NB_MODULE(_psequence, mod) {
 		Traceback (most recent call last):
 		...
 		IndexError: ...
-	)");
+	)", nb::sig("def view(self, *args:int) -> List[Union[PSequence[T],T]]"));
 
 	cls.def("reverse", &Sequence::reverse, R"(
 		Reverse the sequence
@@ -719,7 +719,7 @@ NB_MODULE(_psequence, mod) {
 		psequence([1, 2, 3, 4])
 		>>> psequence([3,1,4,2]).sort(reverse=True)
 		psequence([4, 3, 2, 1])
-	)", nb::sig("def sort(self, *args, **kwargs) -> PSequence[T]"));
+	)", nb::sig("def sort(self, *args:typing.Any, **kwargs:typing.Any) -> PSequence[T]"));
 
 	cls.def("transform", [](nb::object seq, nb::args args) {
 		static nb::object transform;
@@ -727,13 +727,13 @@ NB_MODULE(_psequence, mod) {
 			new (&transform) nb::object(nb::module_::import_
 				("pyrsistent._transformations").attr("transform"));
 		return transform(seq, args);
-	}, nb::sig("def transform(self, *args, **kwargs) -> PSequence[T]"), R"(
+	}, R"(
 		Apply one or more transformations
 
 		>>> from pyrsistent import ny
 		>>> psequence([1,2,3,4]).transform([ny], lambda x: x*2)
 		psequence([2, 4, 6, 8])
-	)", nb::sig("def transform(self, *args, **kwargs) -> PSequence[T]"));
+	)", nb::sig("def transform(self, *args:Any) -> PSequence[T]"));
 
 	cls.def("__hash__", [](const Sequence& seq) {
 		return std::hash<Sequence>()(seq);
@@ -749,9 +749,15 @@ NB_MODULE(_psequence, mod) {
 	)", nb::sig("def __hash__(self) -> int"));
 
 	auto abc = nb::module_::import_("collections.abc");
+
+	cls.def("count", [=](nb::object seq, nb::object value) {
+		return abc.attr("Sequence").attr("count")(seq, value);
+	}, nb::sig("def count(self, value:T) -> int"));
+	cls.def("__contains__", [=](nb::object seq, nb::object value) {
+		return abc.attr("Sequence").attr("__contains__")(seq, value);
+	}, nb::sig("def __contains__(self, value:T) -> bool"));
+
 	abc.attr("Sequence").attr("register")(cls);
-	cls.attr("count") = abc.attr("Sequence").attr("count");
-	cls.attr("__contains__") = abc.attr("Sequence").attr("__contains__");
 	abc.attr("Hashable").attr("register")(cls);
 
 	auto evo = nb::class_<Evolver>(mod, "PSequenceEvolver", nb::is_generic(), R"(
@@ -842,15 +848,13 @@ NB_MODULE(_psequence, mod) {
 	}) {
 		auto [ func, doc, sig ] = pyr_nb::inherit_docstring(
 			cls, name, evo, name, "Mutable version of", [](std::string str)
-			{ return std::regex_replace(str, std::regex("\\s*->\\s*.*"), ""); });
+			{ return std::regex_replace(str, std::regex("\\s*->\\s*.*"), " -> None"); });
 		evo.def(name, [func=func](Evolver& evo, nb::args args, nb::kwargs kwargs) {
 			evo.seq = nb::cast<Sequence>(func(nb::cast(evo.seq), *args, **kwargs));
 		}, doc.c_str(), nb::sig(sig.c_str()));
 	}
 
 	for(auto [source, target] : {
-		std::make_pair("set", "__setitem__"),
-		std::make_pair("delete", "__delitem__"),
 		std::make_pair("extend", "__iadd__"),
 	}) {
 		auto [ func, doc, sig ] = pyr_nb::inherit_docstring(
@@ -858,6 +862,18 @@ NB_MODULE(_psequence, mod) {
 		evo.def(target, [func=func](Evolver& evo, nb::args args, nb::kwargs kwargs) {
 			evo.seq = nb::cast<Sequence>(func(nb::cast(evo.seq), *args, **kwargs));
 			return evo;
+		}, doc.c_str(), nb::sig(sig.c_str()));
+	}
+
+	for(auto [source, target] : {
+		std::make_pair("set", "__setitem__"),
+		std::make_pair("delete", "__delitem__"),
+	}) {
+		auto [ func, doc, sig ] = pyr_nb::inherit_docstring(
+			cls, source, evo, target, "Mutable version of", [](std::string str)
+			{ return std::regex_replace(str, std::regex("\\s*->\\s*.*"), " -> None"); });
+		evo.def(target, [func=func](Evolver& evo, nb::args args, nb::kwargs kwargs) {
+			evo.seq = nb::cast<Sequence>(func(nb::cast(evo.seq), *args, **kwargs));
 		}, doc.c_str(), nb::sig(sig.c_str()));
 	}
 
@@ -902,7 +918,7 @@ NB_MODULE(_psequence, mod) {
 		auto [ func, doc, sig ] = pyr_nb::inherit_docstring(
 			cls, name, evo, name, "Alias of", std::nullopt);
 		evo.def(name, [func=func](Evolver& evo) {
-				return func(nb::cast(evo.seq)) + nb::str(".evolver()");
+			return func(nb::cast(evo.seq)) + nb::str(".evolver()");
 		}, doc.c_str(), nb::sig(sig.c_str()));
 	}
 
