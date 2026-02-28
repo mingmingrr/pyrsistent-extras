@@ -23,6 +23,16 @@ set_target_properties(psequence
 install(TARGETS psequence
 	LIBRARY DESTINATION pyrsistent_extras)
 
+nanobind_add_module(psortedmap
+	NOMINSIZE LTO STABLE_ABI
+	src/pyrsistent_extras/_psortedmap.cpp)
+target_include_directories(psortedmap
+	PRIVATE src/pyrsistent_extras)
+set_target_properties(psortedmap
+	PROPERTIES OUTPUT_NAME _psortedmap)
+install(TARGETS psortedmap
+	LIBRARY DESTINATION pyrsistent_extras)
+
 option(BUILD_STUBS "Generate Python type stubs" ON)
 if(BUILD_STUBS)
 	nanobind_add_stub(
@@ -32,6 +42,13 @@ if(BUILD_STUBS)
 		OUTPUT pyrsistent_extras/_psequence.pyi
 		PYTHON_PATH $<TARGET_FILE_DIR:psequence>
 		DEPENDS psequence)
+	nanobind_add_stub(
+		psortedmap_stub
+		INSTALL_TIME
+		MODULE pyrsistent_extras._psortedmap
+		OUTPUT pyrsistent_extras/_psortedmap.pyi
+		PYTHON_PATH $<TARGET_FILE_DIR:psortedmap>
+		DEPENDS psortedmap)
 endif()
 
 option(BUILD_TESTS "Build with rapidcheck tests" OFF)
@@ -60,7 +77,8 @@ if(BUILD_TESTS)
 
 	add_executable(pyrsistent_tests
 		tests/utility_test.cpp
-		tests/psequence_test.cpp)
+		tests/psequence_test.cpp
+		tests/psortedmap_test.cpp)
 	target_link_libraries(pyrsistent_tests
 		GTest::gtest_main
 		rapidcheck_gtest)

@@ -86,7 +86,7 @@ struct Sequence {
 			return std::visit(overloaded {
 				[&](const Value& value) -> size_t { return 1; },
 				[&](const Branch& branch) -> size_t { return branch.size; },
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr size_t depth() const {
@@ -94,7 +94,7 @@ struct Sequence {
 				[&](const Value& value) -> size_t { return 0; },
 				[&](const Branch& branch) -> size_t
 					{ return branch.items[0]->depth() + 1; },
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		// LCOV_EXCL_START
@@ -111,7 +111,7 @@ struct Sequence {
 					branch.items[1]->pretty(out, depth + 1);
 					if(branch.items[2]) branch.items[2]->pretty(out, depth + 1);
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 		// LCOV_EXCL_STOP
 
@@ -131,7 +131,7 @@ struct Sequence {
 					assert(branch.items[2]);
 					return (*branch.items[2])[index];
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		template<typename Func>
@@ -146,7 +146,7 @@ struct Sequence {
 						branch.items[1]->transform(func),
 						branch.items[2] ? branch.items[2]->transform(func) : nullptr);
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr NodePtr set(size_t index, const Value& value) const {
@@ -165,7 +165,7 @@ struct Sequence {
 					return Node::make(branch.size,
 						branch.items[0], branch.items[1], branch.items[2]->set(index, value));
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		static constexpr std::pair<NodePtr, std::optional<NodePtr>>
@@ -202,7 +202,7 @@ struct Sequence {
 							Node::make(node, *extra)};
 					}
 				},
-			}, *node);
+			}, static_cast<Variant>(*node));
 		}
 
 		static constexpr std::pair<NodePtr, std::optional<NodePtr>>
@@ -218,7 +218,7 @@ struct Sequence {
 					return {Node::make(left, branch.items[0]),
 						Node::make(branch.items[1], branch.items[2])};
 				},
-			}, *node);
+			}, static_cast<Variant>(*node));
 		}
 
 		static constexpr std::pair<NodePtr, std::optional<NodePtr>>
@@ -234,7 +234,7 @@ struct Sequence {
 					return {Node::make(branch.items[0], branch.items[1]),
 						Node::make(branch.items[2], right)};
 				},
-			}, *node);
+			}, static_cast<Variant>(*node));
 		}
 
 		static constexpr std::pair<bool, NodePtr>
@@ -287,7 +287,7 @@ struct Sequence {
 							branch.items[0], Node::merge_right(branch.items[1], node));
 					}
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		static constexpr NodePtr reverse(const NodePtr& node) {
@@ -302,7 +302,7 @@ struct Sequence {
 						Node::reverse(branch.items[1]),
 						Node::reverse(branch.items[0]));
 				},
-			}, *node);
+			}, static_cast<Variant>(*node));
 		}
 	};
 
@@ -347,7 +347,7 @@ struct Sequence {
 					return Digit::make(branch.size, 2,
 						branch.items[0], branch.items[1]);
 				},
-			}, *node);
+			}, static_cast<typename Node::Variant>(*node));
 		}
 
 		static constexpr DigitPtr from(uint_least8_t order, const NodePtr* node) {
@@ -556,7 +556,7 @@ struct Sequence {
 						return Digit::make(merge, *extra, branch.items[1]);
 					return Digit::make(merge, *extra, branch.items[1], branch.items[2]);
 				},
-			}, *node);
+			}, static_cast<typename Node::Variant>(*node));
 		}
 
 		static constexpr DigitPtr merge_right(const NodePtr& node, const NodePtr& right) {
@@ -576,7 +576,7 @@ struct Sequence {
 						return Digit::make(branch.items[0], branch.items[1], merge, *extra);
 					}
 				},
-			}, *node);
+			}, static_cast<typename Node::Variant>(*node));
 		}
 
 		constexpr DigitPtr reverse() const {
@@ -752,7 +752,7 @@ struct Sequence {
 				[](const Empty& _) -> size_t { return 0; },
 				[](const NodePtr& node) -> size_t { return node->depth(); },
 				[](const DeepPtr& deep) -> size_t { return deep->left->depth(); },
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr operator bool() const
@@ -763,7 +763,7 @@ struct Sequence {
 				[](const Empty& _) -> size_t { return 0; },
 				[](const NodePtr& node) -> size_t { return node->size(); },
 				[](const DeepPtr& deep) -> size_t { return deep->size; },
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		// LCOV_EXCL_START
@@ -780,7 +780,7 @@ struct Sequence {
 					deep->middle.pretty(out, depth + 1);
 					deep->right->pretty(out, depth + 1);
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 		// LCOV_EXCL_STOP
 
@@ -802,7 +802,7 @@ struct Sequence {
 							items[1], items[2], items[3])),
 						deep->right);
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr Tree push_back(const NodePtr& x) const {
@@ -822,7 +822,7 @@ struct Sequence {
 							items[0], items[1], items[2])),
 						Digit::make(items[3], x));
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr std::pair<NodePtr, Tree> view_front() const {
@@ -838,7 +838,7 @@ struct Sequence {
 					return {head, Deep::make(deep->size - head->size(),
 						left, deep->middle, deep->right)};
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr Tree pull_left(const DigitPtr& right) const {
@@ -861,7 +861,7 @@ struct Sequence {
 					return {Deep::make(deep->size - last->size(),
 						deep->left, deep->middle, right), last};
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr Tree pull_right(const DigitPtr& left) const {
@@ -884,7 +884,7 @@ struct Sequence {
 						return deep->middle[index];
 					return (*deep->right)[index];
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr Tree append(const Tree& that) const {
@@ -934,9 +934,9 @@ struct Sequence {
 							return Deep::make(left->size + right->size,
 								left->left, left->middle.append(rtree), right->right);
 						},
-					}, that);
+					}, static_cast<Variant>(that));
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr Tree set(size_t index, const Value& value) const {
@@ -955,7 +955,7 @@ struct Sequence {
 					return Deep::make(deep->size,
 						deep->left, deep->middle, deep->right->set(index, value));
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr Tree insert(size_t index, const Value& value) const {
@@ -981,7 +981,7 @@ struct Sequence {
 					auto middle = extra ? deep->middle.push_back(*extra) : deep->middle;
 					return Deep::make(deep->size + 1, deep->left, middle, digit);
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr std::pair<bool, Tree> erase(size_t index) const {
@@ -1051,7 +1051,7 @@ struct Sequence {
 						},
 					}, deep->right->erase(index));
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr std::tuple<Tree, NodePtr, Tree> split(size_t index) const {
@@ -1102,7 +1102,7 @@ struct Sequence {
 							Tree::from(deep->right->order - i - 1, &items[i+1])};
 					}
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr std::pair<Tree, NodePtr> take_front(size_t index) const {
@@ -1142,7 +1142,7 @@ struct Sequence {
 							Digit::from(i, items)), items[i]};
 					}
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr std::pair<NodePtr, Tree> take_back(size_t index) const {
@@ -1186,7 +1186,7 @@ struct Sequence {
 							deep->middle, deep->right)};
 					}
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		template<typename Func>
@@ -1202,7 +1202,7 @@ struct Sequence {
 						deep->middle.transform(func),
 						deep->right->transform(func));
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 
 		constexpr Tree reverse() const {
@@ -1213,7 +1213,7 @@ struct Sequence {
 					return Deep::make(deep->right->reverse(),
 						deep->middle.reverse(), deep->left->reverse());
 				},
-			}, *this);
+			}, static_cast<Variant>(*this));
 		}
 	};
 
@@ -1280,7 +1280,7 @@ struct Sequence {
 				{ return node->value(); },
 			[](const DeepPtr& deep) -> Value
 				{ return deep->left->items[0]->value(); },
-		}, this->tree);
+		}, static_cast<typename Tree::Variant>(this->tree));
 	}
 
 	constexpr Value back() const {
@@ -1291,7 +1291,7 @@ struct Sequence {
 				{ return node->value(); },
 			[](const DeepPtr& deep) -> Value
 				{ return deep->right->back()->value(); },
-		}, this->tree);
+		}, static_cast<typename Tree::Variant>(this->tree));
 	}
 
 	constexpr std::pair<Value, Sequence> view_front() const {
@@ -1488,7 +1488,7 @@ struct Sequence {
 							}
 							this->advance(n);
 						},
-					}, *node);
+					}, static_cast<typename Node::Variant>(*node));
 				},
 				[&](DigitPtr digit) {
 					this->stack = this->stack.tail();
@@ -1520,7 +1520,7 @@ struct Sequence {
 								this->stack = Stack(deep->middle, this->stack);
 								this->stack = Stack(Reverse ? deep->right : deep->left, this->stack);
 							},
-						}, tree);
+						}, static_cast<typename Tree::Variant>(tree));
 					}
 					this->advance(n);
 				},
