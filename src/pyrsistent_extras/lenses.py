@@ -1,13 +1,15 @@
+# pyright: reportUnusedFunction=false
+
 from __future__ import annotations
 
-from typing import *
+from typing import TypeVar, Iterator, cast, Any, Tuple
 
 from ._utility import Comparable
 
 from ._pheap import PMinHeap, pminheap, PMaxHeap, pmaxheap
 from ._psequence import PSequence, psequence
 
-from lenses import hooks
+from lenses import hooks # type: ignore
 
 T = TypeVar('T')
 K = TypeVar('K', bound=Comparable)
@@ -28,7 +30,7 @@ def _psequence_from_iter(self:PSequence[T], items:Iterator[T]) -> PSequence[T]:
 
 @hooks.contains_add.register(PMinHeap)
 def _pminheap_contains_add(self:PMinHeap[K,None], key:K) -> PMinHeap[K,None]:
-	return cast(PMinHeap, self.push(key, None))
+	return cast(PMinHeap[K,None], self.push(key, None))
 @hooks.contains_remove.register(PMinHeap)
 def _pminheap_contains_remove(self:PMinHeap[K,Any], key:K) -> PMinHeap[K,Any]:
 	return pminheap((k, v) for k, v in self.items() if key != k)
@@ -41,7 +43,7 @@ def _pminheap_from_iter(self:PMinHeap[Any,Any], items:Iterator[Tuple[K,V]]) -> P
 
 @hooks.contains_add.register(PMaxHeap)
 def _pmaxheap_contains_add(self:PMaxHeap[K,None], key:K) -> PMaxHeap[K,None]:
-	return cast(PMaxHeap, self.push(key, None))
+	return cast(PMaxHeap[K,None], self.push(key, None))
 @hooks.contains_remove.register(PMaxHeap)
 def _pmaxheap_contains_remove(self:PMaxHeap[K,Any], key:K) -> PMaxHeap[K,Any]:
 	return pmaxheap((k, v) for k, v in self.items() if key != k)
