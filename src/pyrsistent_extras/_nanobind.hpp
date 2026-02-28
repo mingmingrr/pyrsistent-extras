@@ -6,7 +6,6 @@
 #include <optional>
 #include <functional>
 #include <regex>
-#include <sstream>
 
 #include <nanobind/nanobind.h>
 #include <nanobind/operators.h>
@@ -61,7 +60,7 @@ struct object_view : public nb::object {
 // nb::object evolver_inherit(Args... args)
 	// { return evolver_inherit([](auto evo) { return evo.def; }); }
 
-inline std::tuple<nb::object, std::string, std::string> inherit_docstring(
+std::tuple<nb::object, std::string, std::string> inherit_docstring(
 	nb::object src_obj, const char* src_attr,
 	nb::object dest_obj, const char* dest_attr,
 	std::variant<std::nullopt_t, const char*,
@@ -71,13 +70,11 @@ inline std::tuple<nb::object, std::string, std::string> inherit_docstring(
 ) {
 	nb::object func = src_obj.attr(src_attr);
 	const char* src_cls = nb::str(src_obj.attr("__name__")).c_str();
+	std::string src_meth = std::string(":meth:`") + src_cls + '.' + src_attr + '`';
 	std::string doc = std::visit(overloaded {
-		[&](std::nullopt_t) { return (std::ostringstream()
-			<< "See :meth:`" << src_cls << "." << src_attr << "`").str(); },
-		[&](const char* prefix) { return (std::ostringstream()
-			<< prefix << " :meth:`" << src_cls << "." << src_attr << "`").str(); },
-		[&](auto func) { return func((std::ostringstream()
-			<< ":meth:`" << src_cls << "." << src_attr << "`").str()); },
+		[&](std::nullopt_t) { return "See " + src_meth; },
+		[&](const char* prefix) { return prefix + (' ' + src_meth); },
+		[&](auto func) { return func(src_meth); },
 	}, docstring);
 	std::string sig; do {
 		nb::object nbsig = nb::getattr(func, "__nb_signature__", nb::none());
@@ -99,14 +96,14 @@ inline std::tuple<nb::object, std::string, std::string> inherit_docstring(
 			: nb::str(nb::module_::import_
 				("inspect").attr("signature")(func)).c_str();
 	}
-	sig = (std::ostringstream() << "def " << dest_attr << sig).str();
+	sig = std::string("def ") + dest_attr + sig;
 	sig = std::visit(overloaded {
 		[&](std::nullopt_t) -> std::string { return sig; },
 		[&](const char*) -> std::string { return sig; },
 		[&](auto func) -> std::string { return func(sig); },
 	}, signature);
 	const char* tname = nb::str(dest_obj.attr("__name__")).c_str();
-	std::regex srcregex((std::ostringstream() << "\\b" << src_cls << "\\b").str());
+	std::regex srcregex(std::string("\\b") + src_cls + "\\b");
 	sig = std::regex_replace(sig, srcregex, tname);
 	return std::make_tuple(func, doc, sig);
 }
@@ -123,10 +120,9 @@ decltype(auto) evolver_inherit(
 	nb::object fn = cls.attr(names.first);
 	const char* clsname = nb::str(cls.attr("__name__")).c_str();
 	const char* evoname = nb::str(evo.attr("__name__")).c_str();
-	std::string doc = (std::ostringstream() << docstring
-		<< " of :meth:`" << clsname << "." << names.first << "`").str();
-	std::regex clsregex((std::ostringstream()
-		<< "\\b" << clsname << "\\b").str());
+	std::string doc = std::string(docstring)
+		+ " of :meth:`" + clsname + '.' + names.first + '`';
+	std::regex clsregex(std::string("\\b") + clsname + "\\b");
 	std::string sig;
 	nb::object nbsig = nb::getattr(fn, "__nb_signature__", nb::none());
 	if(nb::isinstance<nb::tuple>(nbsig) && nb::len(nbsig) > 0) {
@@ -137,8 +133,7 @@ decltype(auto) evolver_inherit(
 			}
 		}
 	}
-	if(sig.empty()) sig = (std::ostringstream()
-		<< "def " << names.second << *signature).str();
+	if(sig.empty()) sig = std::string("def ") + names.second + *signature;
 	sig = std::regex_replace(sig, clsregex, "PSequenceEvolver");
 	return prop(doc.c_str(), nb::sig(sig.c_str()));
 }
