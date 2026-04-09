@@ -3,6 +3,7 @@
 from __future__ import annotations
 from typing import Collection, Iterable, Iterator, Hashable, ClassVar, \
 	TypeVar, Generic, Optional, Tuple, Any, Union, cast, overload
+from typing_extensions import Self
 from abc import abstractmethod
 
 import itertools
@@ -468,7 +469,7 @@ class PHeap(Generic[K,V], Collection[K], Hashable):
 		return iter(PHeapKeys(self, True))
 
 	@classmethod
-	def _fromitems(cls, items:PHeapLike[K,V]) -> PHeap[K,V]:
+	def _fromitems(cls, items:PHeapLike[K,V]) -> Self:
 		if isinstance(items, PHeap):
 			if items._down == cls._down: return items
 			return cls._fromitems(items.items(sorted=False))
@@ -738,13 +739,15 @@ def pmaxheap(items:PHeapLike[K,V]=PMaxHeap._empty) -> PMaxHeap[K,V]:
 	>>> pmaxheap([(1,'a'), (2,'b'), (3,'c')])
 	pmaxheap([(3, 'c'), (2, 'b'), (1, 'a')])
 	'''
-	return cast(PMaxHeap, PMaxHeap._fromitems(items))
+	return cast(PMaxHeap[K,V], PMaxHeap[K,V]._fromitems(items))
 
 @overload
 def pmaxheap_fromkeys(items:Iterable[K]) -> PMaxHeap[K,None]: ...
 @overload
 def pmaxheap_fromkeys(items:Iterable[K], value:V) -> PMaxHeap[K,V]: ...
-def pmaxheap_fromkeys(items, value=None):
+def pmaxheap_fromkeys(
+	items:Iterable[K], value:Optional[V]=None
+) -> Union[PMaxHeap[K,V], PMaxHeap[K,None]]:
 	r'''
 	Create a :class:`PMaxHeap` using a default value
 
