@@ -118,13 +118,11 @@ struct SortedMap {
 				: Node::glue(node->left, node->right);
 		}
 
-		static constexpr std::optional<Value> lookup(NodePtr node, const Key& key) {
-			while(node) {
-				if(key < node->key) node = node->left;
-				else if(node->key < key) node = node->right;
-				else return node->value;
-			}
-			return std::nullopt;
+		static constexpr std::optional<Value> at(const NodePtr& node, const Key& key) {
+			if(!node) return std::nullopt;
+			if(key < node->key) return at(node->left, key);
+			if(node->key < key) return at(node->right, key);
+			return node->value;
 		}
 
 		constexpr std::tuple<Key, Value, NodePtr> viewmin() const {
@@ -224,7 +222,7 @@ struct SortedMap {
 			if(!low || *low < node->key) {
 				if(!high || node->key < high) {
 					if(!low) return std::make_pair(std::nullopt, node);
-					return std::make_pair(Node::lookup(node, *low), node);
+					return std::make_pair(Node::at(node, *low), node);
 				} else return Node::trim(node->left, low, high);
 			} else if(node->key < low) return Node::trim(node->right, low, high);
 			else return std::make_pair(node->value, Node::trim(node->right, low, high).second);
@@ -310,6 +308,109 @@ struct SortedMap {
 			++left;
 		}
 	}
+
+	constexpr size_t size() const
+		{ return Node::sizes(this->node); }
+
+	constexpr operator bool() const
+		{ return bool(this->node); }
+	constexpr bool empty() const
+		{ return !this->node; }
+
+	constexpr std::optional<Value> at(const Key& key) {
+		return Node::at(this->node, key);
+	}
+
+	constexpr std::optional<Value> at(const Key& left, const Key& right) {
+		auto [_, value1, node1] = Node::split(this->node, left);
+		if(value1) node1 = Node::insert(node1, left, *value1);
+		auto [node2, value2, __] = Node::split(node1, right);
+		if(value2) node2 = Node::insert(node2, right, *value2);
+		return SortedMap(std::move(node2));
+	}
+
+	constexpr SortedMap insert(const Key& key, const Value& value) {
+		return SortedMap(Node::insert(this->node, key, value));
+	}
+
+	constexpr std::pair<std::optional<Value>, SortedMap> pop(const Key& key) {
+		auto [value, node] = Node::pop(this->node, key);
+		return std::make_pair(value, SortedMap(std::move(node)));
+	}
+
+	template<bool Reverse=false>
+	struct Iterator {
+		using value_type = const Value;
+		using difference_type = std::ptrdiff_t;
+		using reference = const Value&;
+		using pointer = const Value*;
+		using iterator_category = std::forward_iterator_tag;
+
+		using Stack = List<std::pair<bool, NodePtr>>;
+		Stack stack;
+
+		Iterator() : stack() { }
+		Iterator(const Iterator&) = default;
+		Iterator(Iterator&&) = default;
+		explicit Iterator(const SortedMap& xs)
+			: stack(std::make_pair(false, xs.node), Stack())
+			{ this->advance(); }
+
+		constexpr void advance() {
+			if(this->stack.empty()) return;
+			auto& [seen, node] = this->stack.head();
+			if(!node) {
+				this->stack = this->stack.tail();
+				return this->advance();
+			}
+			if(seen) {
+				auto target = Reverse ? node->left : node->right;
+				this->stack = Stack(std::make_pair(false, target), this->stack.tail());
+				return;
+			}
+			auto target = Reverse ? node->right : node->left;
+			this->stack = Stack(std::make_pair(false, target),
+				Stack(std::make_pair(true, node), this->stack.tail()));
+			return this->advance();
+		}
+
+		constexpr Iterator& operator ++() {
+			if(this->stack.size()) {
+				this->stack = this->stack.tail();
+				this->advance();
+			}
+			return *this;
+		}
+
+		constexpr Iterator operator ++(int)
+			{ Iterator copy(*this); ++*this; return copy; }
+
+		constexpr const Value& operator *() const
+			{ return std::get<Value>(*std::get<NodePtr>(this->stack.head())); }
+
+		constexpr bool operator ==(const Iterator& that) const
+			{ return this->stack == that.stack; }
+		constexpr bool operator !=(const Iterator& that) const
+			{ return !(*this == that); }
+
+		constexpr bool empty() const
+			{ return this->stack.empty(); }
+	};
+
+	using iterator = Iterator<false>;
+
+	constexpr iterator begin() const
+		{ return iterator(*this); }
+	constexpr iterator end() const
+		{ return iterator(); }
+
+	using reverse_iterator = Iterator<true>;
+
+	constexpr reverse_iterator rbegin() const
+		{ return reverse_iterator(*this); }
+	constexpr reverse_iterator rend() const
+		{ return reverse_iterator(); }
+
 };
 
 template struct SortedMap<int, bool>;
@@ -319,4 +420,6 @@ template struct SortedMap<int, bool>;
 // template<typename Value, typename Allocator>
 // struct std::hash<pyrsistent::SortedMap<Value, Allocator>>
 	// : public pyrsistent::HashIterable<pyrsistent::SortedMap<Value, Allocator>> { };
+
+template struct pyrsistent::SortedMap<int, int>;
 
