@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <iterator>
 #include <memory>
 #include <algorithm>
@@ -49,9 +50,9 @@ struct SortedMap {
 			: Node(key, value, Node::sizes(left) + Node::sizes(right), left, right) { }
 		Node(const Key& key, const Value& value, ssize_t size,
 			const NodePtr& left, const NodePtr& right)
-			: Node(key, value, size, left, right) { }
+			: key(key), value(value), size(size), left(left), right(right) { }
 
-		constexpr size_t sizes(const NodePtr& node)
+		static constexpr size_t sizes(const NodePtr& node)
 			{ return node ? node->size : 0; }
 
 		static constexpr NodePtr balance(
@@ -88,15 +89,36 @@ struct SortedMap {
 		static constexpr NodePtr insert(const NodePtr& node, const Key& key, const Value& value) {
 			if(!node) return Node::make(key, value);
 			if(key < node->key)
-				return notnone(Node::balance(node->key, node->value,
-					Node::insert(node->left, key, value), node->right));
+				return Node::balance(node->key, node->value,
+					Node::insert(node->left, key, value), node->right);
 			if(node->key < key)
-				return notnone(Node::balance(node->key, node->value,
-					node->left, Node::insert(node->right, key, value)));
+				return Node::balance(node->key, node->value,
+					node->left, Node::insert(node->right, key, value));
 			return Node::make(key, value, node->size, node->left, node->right);
 		}
 
-		static constexpr std::optional<Value> lookup(const NodePtr& node, const Key& key) {
+		template<typename Func>
+		static constexpr NodePtr alter(
+			const NodePtr& node,
+			const Key& key,
+			const Func& func
+		) {
+			if(!node) {
+				auto value = func(key, std::nullopt);
+				return value ? Node::make(key, *value) : node;
+			}
+			if(key < node->key)
+				return Node::balance(node->key, node->value,
+					Node::alter(node->left, key, func), node->right);
+			if(node->key < key)
+				return Node::balance(node->key, node->value,
+					node->left, Node::alter(node->right, key, func));
+			auto value = func(key, node->value);
+			return value ? Node::make(key, *value, node->size, node->left, node->right)
+				: Node::glue(node->left, node->right);
+		}
+
+		static constexpr std::optional<Value> lookup(NodePtr node, const Key& key) {
 			while(node) {
 				if(key < node->key) node = node->left;
 				else if(node->key < key) node = node->right;
@@ -195,14 +217,14 @@ struct SortedMap {
 
 		static constexpr std::pair<std::optional<Value>, NodePtr> trim(
 			const NodePtr& node,
-			std::optional<const Key&> low,
-			std::optional<const Key&> high
+			const std::optional<Key>& low,
+			const std::optional<Key>& high
 		) {
 			if(!node) return std::make_pair(std::nullopt, node);
 			if(!low || *low < node->key) {
 				if(!high || node->key < high) {
 					if(!low) return std::make_pair(std::nullopt, node);
-					return std::make_pair(Node::get(node, low), node);
+					return std::make_pair(Node::lookup(node, *low), node);
 				} else return Node::trim(node->left, low, high);
 			} else if(node->key < low) return Node::trim(node->right, low, high);
 			else return std::make_pair(node->value, Node::trim(node->right, low, high).second);
@@ -213,8 +235,8 @@ struct SortedMap {
 			const NodePtr& left,
 			const NodePtr& right,
 			const Func& func,
-			const std::optional<const Key&> low,
-			const std::optional<const Key&> high
+			const std::optional<Key>& low,
+			const std::optional<Key>& high
 		) {
 			if(!right) return left;
 			if(!left) return Node::join(right->key, right->value,
@@ -248,8 +270,8 @@ struct SortedMap {
 			const NodePtr& left,
 			const NodePtr& right,
 			const Func& func,
-			const std::optional<const Key&> low,
-			const std::optional<const Key&> high
+			const std::optional<Key>& low,
+			const std::optional<Key>& high
 		) {
 			if(!left) return left;
 			if(!right) return Node::join(left.key, left.value,
@@ -277,17 +299,20 @@ struct SortedMap {
 	SortedMap() : node() { }
 	SortedMap(const SortedMap&) = default;
 	SortedMap(NodePtr&& node) : node(std::move(node)) { }
-	SortedMap(std::initializer_list<Value> xs)
+	SortedMap(std::initializer_list<std::pair<Key, Value>> xs)
 		: SortedMap(xs.begin(), xs.end()) { }
 
 	template<typename Iterator>
 	SortedMap(Iterator left, const Iterator& right) : node() {
 		while(left != right) {
-			this->node = Node::insert(this->node, *left);
+			auto [key, value] = *left;
+			this->node = Node::insert(this->node, key, value);
 			++left;
 		}
 	}
 };
+
+template struct SortedMap<int, bool>;
 
 }
 
