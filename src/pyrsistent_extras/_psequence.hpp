@@ -1305,7 +1305,7 @@ struct Sequence {
 	}
 
 	constexpr Value operator [](size_t index) const
-		{ return this->tree[index]; }
+		{ return this->at(index); }
 
 	constexpr Value at(size_t index) const {
 		if(index >= this->size())
@@ -1454,7 +1454,8 @@ struct Sequence {
 		using pointer = const Value*;
 		using iterator_category = std::forward_iterator_tag;
 
-		using Stack = List<std::variant<NodePtr, DigitPtr, Tree>>;
+		using Variant = std::variant<NodePtr, DigitPtr, Tree>;
+		using Stack = List<Variant>;
 		Stack stack;
 
 		Iterator() : stack() { }
@@ -1464,7 +1465,7 @@ struct Sequence {
 			: stack(seq.tree, Stack())
 			{ this->advance(0); }
 
-		const void advance(size_t n) {
+		constexpr void advance(size_t n) {
 			if(this->stack.empty()) return;
 			std::visit(overloaded {
 				[&](NodePtr node) {
@@ -1524,7 +1525,7 @@ struct Sequence {
 					}
 					this->advance(n);
 				},
-			}, this->stack.head());
+			}, static_cast<Variant>(this->stack.head()));
 		}
 
 		constexpr Iterator& operator ++() {

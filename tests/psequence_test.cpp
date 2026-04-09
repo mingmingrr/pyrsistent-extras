@@ -138,7 +138,7 @@ size_t check(const NodePtr<Value>& node, int depth, std::vector<Value>& elems) {
 			if(Assert) RC_ASSERT(branch.size == size);
 			return size;
 		}
-	}, *node);
+	}, static_cast<typename Node<Value>::Variant>(*node));
 }
 
 template<typename Value, bool Assert=true>
@@ -175,7 +175,7 @@ size_t check(const Tree<Value>& tree, int depth, std::vector<Value>& elems) {
 			if(Assert) RC_ASSERT(deep->size == size);
 			return size;
 		},
-	}, tree);
+	}, static_cast<typename Tree<Value>::Variant>(tree));
 }
 
 template<typename Value, bool Assert=true>
