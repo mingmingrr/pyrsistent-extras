@@ -11,7 +11,16 @@ include(FetchContent)
 find_package(Python 3.7
 	REQUIRED COMPONENTS Interpreter Development.Module
 	OPTIONAL_COMPONENTS Development.SABIModule)
-find_package(nanobind CONFIG REQUIRED)
+
+option(FETCH_NANOBIND "Fetch nanobind from git" OFF)
+if(FETCH_NANOBIND)
+	FetchContent_Declare(nanobind
+		GIT_REPOSITORY git@github.com:wjakob/nanobind.git
+		GIT_TAG        b50c3d80bab4f16ee57d680cab113925a7284880)
+	FetchContent_MakeAvailable(nanobind)
+else()
+	find_package(nanobind CONFIG REQUIRED)
+endif()
 
 nanobind_add_module(psequence
 	NOMINSIZE LTO STABLE_ABI
