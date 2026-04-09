@@ -131,7 +131,7 @@ struct List {
 			{ return !(*this == that); }
 
 		inline constexpr operator bool() const noexcept
-			{ return this->list.empty(); }
+			{ return !this->list.empty(); }
 	};
 
 	inline constexpr iterator begin() const
