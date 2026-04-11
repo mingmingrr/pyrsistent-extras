@@ -3,7 +3,7 @@
 #include <rapidcheck/gtest.h>
 
 #include <map>
-#include <vector>
+// #include <vector>
 #include <algorithm>
 
 #include "_psortedmap.hpp"
@@ -21,31 +21,24 @@ using NodePtr = typename SortedMap<Key, Value>::NodePtr;
 
 template<typename Key, typename Value>
 struct rc::Arbitrary<SortedMap<Key, Value>> {
-	using Cache = std::vector<std::pair<Key, Value>>;
-	static rc::Gen<NodePtr<Key, Value>> arbitrary_node(
-		typename Cache::iterator left, typename Cache::iterator right
-	) {
-		if(left == right) return nullptr;
-		return rc::gen::map(rc::gen::inRange(0, std::distance(left, right)), [&](int index) {
-			auto middle = left + index;
-			return Node<Key, Value>::balance((left + index)->first, (left + index)->second,
-				arbitrary_node(left, middle), arbitrary_node(middle + 1, right));
-		});
+	using Elems = std::vector<std::pair<Key, Value>>;
+	static rc::Gen<NodePtr<Key, Value>>
+	arbitrary_node(std::shared_ptr<Elems> elems, size_t left, size_t right) {
+		if(left == right) return rc::gen::just<NodePtr<Key, Value>>(nullptr);
+		return rc::gen::mapcat(rc::gen::inRange(left, right),
+			[=](size_t index) { return rc::gen::apply(
+				[=](auto lnode, auto rnode) { return Node<Key, Value>::join(
+					elems->at(index).first, elems->at(index).second, lnode, rnode); },
+				arbitrary_node(elems, left, index),
+				arbitrary_node(elems, index + 1, right)); });
 	}
 	static rc::Gen<SortedMap<Key, Value>> arbitrary() {
-		return rc::gen::map(rc::gen::arbitrary<Cache>(), [](Cache& cache) {
-			std::sort(cache.begin(), cache.end());
-			for(int i = 0; i < cache.length; ++i) cache[i].first += i;
-			return rc::gen::map(arbitrary_node(cache.begin(), cache.end()),
-				[](const NodePtr<Key, Value>& node) { return SortedMap<Key, Value>(node); });
-		});
+		return rc::gen::mapcat(rc::gen::arbitrary<std::map<Key, Value>>(),
+		[](auto gens) { auto elems = std::make_shared<Elems>(gens.begin(), gens.end());
+			return rc::gen::map(arbitrary_node(elems, 0, elems->size()),
+			[](auto node) { return SortedMap<Key, Value>(std::move(node)); }); });
 	}
 };
-
-template<class... Ts>
-struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
 
 // LCOV_EXCL_START
 namespace std {
@@ -59,7 +52,7 @@ namespace pyrsistent {
 		{ smap.pretty(out); }
 	template<typename Key, typename Value>
 	void showValue(const Node<Key, Value>& node, std::ostream& out)
-		{ node.pretty(out, 0); }
+		{ Node<Key, Value>::pretty(node, out, 0); }
 }
 // LCOV_EXCL_STOP
 
@@ -77,12 +70,11 @@ size_t check(
 	auto lsize = check(node->left, low, std::make_optional(node->key), elems);
 	elems.insert(std::make_pair(node->key, node->value));
 	auto rsize = check(node->right, std::make_optional(node->key), high, elems);
-	if(Assert) {
-		float ratio = lsize > rsize ? float(lsize) / rsize : float(rsize) / lsize,
-			gamma = float(SortedMap<Key, Value>::gamma),
-			delta = float(SortedMap<Key, Value>::delta);
-		RC_ASSERT(gamma <= ratio);
-		RC_ASSERT(ratio <= delta);
+	if(Assert && !lsize) RC_ASSERT(rsize <= 2);
+	if(Assert && !rsize) RC_ASSERT(lsize <= 2);
+	if(Assert && lsize && rsize) {
+		float ratio = lsize > rsize ? float(lsize) / rsize : float(rsize) / lsize;
+		RC_ASSERT(ratio <= (SortedMap<Key, Value>::delta));
 	}
 	return lsize + rsize + 1;
 }
@@ -100,6 +92,10 @@ template<typename Key, typename Value>
 std::map<Key, Value> tomap(const SortedMap<Key, Value>& smap)
 	{ return check<Key, Value, false>(smap); }
 
+template<typename Key, typename Value>
+std::optional<Value> lookup(const std::map<Key, Value>& elems, const Key& key)
+	{ return elems.count(key) ? std::make_optional(elems.at(key)) : std::nullopt; }
+
 RC_GTEST_PROP(SortedMap, check, (SortedMap<int, int> smap)) {
 	RC_ASSERT(check(smap) == tomap(smap));
 }
@@ -114,9 +110,37 @@ RC_GTEST_PROP(SortedMap, size, (SortedMap<int, int> smap)) {
 	RC_ASSERT(smap.size() == tomap(smap).size());
 }
 
-// RC_GTEST_PROP(SortedMap, insert, (SortedMap<int, int> smap, int k, int v)) {
+RC_GTEST_PROP(SortedMap, insert, (SortedMap<int, int> smap, int k, int v)) {
+	auto elems = tomap(smap);
+	elems[k] = v;
+	RC_ASSERT(check(smap.insert(k, v)) == elems);
+}
+
+RC_GTEST_PROP(SortedMap, at, (SortedMap<int, int> smap, int k)) {
+	auto elems = tomap(smap);
+	RC_ASSERT(smap.at(k) == lookup(elems, k));
+}
+
+RC_GTEST_PROP(SortedMap, pop, (SortedMap<int, int> smap, int k)) {
+	auto elems = tomap(smap);
+	auto [value, smap1] = smap.pop(k);
+	auto expect = lookup(elems, k);
+	elems.erase(k);
+	RC_ASSERT(value == expect);
+	RC_ASSERT(check(smap1) == elems);
+}
+
+RC_GTEST_PROP(SortedMap_Iterator, tolist, (SortedMap<int, int> smap)) {
+	using Array = std::vector<std::pair<int, int>>;
+	std::map<int, int> elems = tomap(smap);
+	Array flats = Array(elems.begin(), elems.end());
+	RC_ASSERT((Array(smap.begin(), smap.end())) == flats);
+}
+
+// RC_GTEST_PROP(SortedMap_RIterator, tolist, (SortedMap<int, int> smap)) {
+	// using Array = std::vector<std::pair<int, int>>;
 	// auto elems = tomap(smap);
-	// elems.insert(elems.begin(), std::make_pair(k, v));
-	// RC_ASSERT(check(smap.insert(k)) == elems);
+	// auto flats = Array(elems.rbegin(), elems.rend());
+	// RC_ASSERT((Array(smap.rbegin(), smap.rend())) == flats);
 // }
 

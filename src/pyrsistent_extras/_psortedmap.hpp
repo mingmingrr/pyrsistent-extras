@@ -25,7 +25,7 @@ template<
 struct SortedMap {
 	struct Node;
 
-	static constexpr uint_least8_t delta = 4;
+	static constexpr uint_least8_t delta = 3;
 	static constexpr uint_least8_t gamma = 2;
 
 	using NodePtr = std::shared_ptr<Node>;
@@ -47,10 +47,22 @@ struct SortedMap {
 			: Node(key, value, 1, nullptr, nullptr) { }
 		Node(const Key& key, const Value& value,
 			const NodePtr& left, const NodePtr& right)
-			: Node(key, value, Node::sizes(left) + Node::sizes(right), left, right) { }
+			: Node(key, value, Node::sizes(left) + Node::sizes(right) + 1, left, right) { }
 		Node(const Key& key, const Value& value, ssize_t size,
 			const NodePtr& left, const NodePtr& right)
-			: key(key), value(value), size(size), left(left), right(right) { }
+			: key(key), value(value), size(size), left(left), right(right)
+			{ assert(size == Node::sizes(left) + Node::sizes(right) + 1); }
+
+		// LCOV_EXCL_START
+		static constexpr void pretty(const NodePtr& node, std::ostream& out, size_t depth) {
+			if(!node) return;
+			Node::pretty(node->left, out, depth + 1);
+			for(auto i = depth; i--;) out << "  ";
+			out << "Node[" << node->size << "] "
+				<< node->key << ": " << node->value << std::endl;
+			Node::pretty(node->right, out, depth + 1);
+		}
+		// LCOV_EXCL_STOP
 
 		static constexpr size_t sizes(const NodePtr& node)
 			{ return node ? node->size : 0; }
@@ -187,13 +199,13 @@ struct SortedMap {
 		) {
 			if(!left) return Node::insert(right, key, value);
 			if(!right) return Node::insert(left, key, value);
-			if(delta * left->size <= right->size)
-				return Node::make(right->key, right->value,
+			if(delta * left->size < right->size)
+				return Node::balance(right->key, right->value,
 					Node::join(key, value, left, right->left), right->right);
-			if(delta * right->size <= left->size)
-				return Node::make(left->key, left->value,
+			if(delta * right->size < left->size)
+				return Node::balance(left->key, left->value,
 					left->left, Node::join(key, value, left->right, right));
-			return Node::make(key, value, left, right);
+			return Node::balance(key, value, left, right);
 		}
 
 		static constexpr std::tuple<NodePtr, std::optional<Value>, NodePtr> split(
@@ -309,6 +321,16 @@ struct SortedMap {
 		}
 	}
 
+	// LCOV_EXCL_START
+	void pretty(std::ostream& out) const
+		{ Node::pretty(this->node, out, 0); }
+	std::string pretty() const {
+		std::ostringstream out;
+		this->pretty(out);
+		return out.str();
+	}
+	// LCOV_EXCL_STOP
+
 	constexpr size_t size() const
 		{ return Node::sizes(this->node); }
 
@@ -319,14 +341,6 @@ struct SortedMap {
 
 	constexpr std::optional<Value> at(const Key& key) {
 		return Node::at(this->node, key);
-	}
-
-	constexpr std::optional<Value> at(const Key& left, const Key& right) {
-		auto [_, value1, node1] = Node::split(this->node, left);
-		if(value1) node1 = Node::insert(node1, left, *value1);
-		auto [node2, value2, __] = Node::split(node1, right);
-		if(value2) node2 = Node::insert(node2, right, *value2);
-		return SortedMap(std::move(node2));
 	}
 
 	constexpr SortedMap insert(const Key& key, const Value& value) {
