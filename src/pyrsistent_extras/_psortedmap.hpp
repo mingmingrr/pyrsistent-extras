@@ -4,12 +4,10 @@
 #include <iterator>
 #include <memory>
 #include <algorithm>
-#include <variant>
 #include <optional>
 #include <sstream>
 #include <tuple>
 #include <cassert>
-#include <stdexcept>
 
 #include "_plist.hpp"
 #include "_utility.hpp"
@@ -298,10 +296,10 @@ struct SortedMap {
 		}
 	};
 
-	using value_type = const Value;
+	using value_type = std::pair<const Key, const Value>;
 	using size_type = size_t;
 	using diference_type = std::ptrdiff_t;
-	using const_reference = const Value&;
+	using const_reference = std::pair<const Key&, const Value&>;
 	using reference = const_reference;
 
 	NodePtr node;
@@ -354,10 +352,10 @@ struct SortedMap {
 
 	template<bool Reverse=false>
 	struct Iterator {
-		using value_type = const Value;
+		using value_type = std::pair<const Key, const Value>;
 		using difference_type = std::ptrdiff_t;
-		using reference = const Value&;
-		using pointer = const Value*;
+		using reference = std::pair<const Key&, const Value&>;
+		using pointer = value_type*;
 		using iterator_category = std::forward_iterator_tag;
 
 		using Stack = List<std::pair<bool, NodePtr>>;
@@ -377,11 +375,7 @@ struct SortedMap {
 				this->stack = this->stack.tail();
 				return this->advance();
 			}
-			if(seen) {
-				auto target = Reverse ? node->left : node->right;
-				this->stack = Stack(std::make_pair(false, target), this->stack.tail());
-				return;
-			}
+			if(seen) return;
 			auto target = Reverse ? node->right : node->left;
 			this->stack = Stack(std::make_pair(false, target),
 				Stack(std::make_pair(true, node), this->stack.tail()));
@@ -389,8 +383,11 @@ struct SortedMap {
 		}
 
 		constexpr Iterator& operator ++() {
-			if(this->stack.size()) {
-				this->stack = this->stack.tail();
+			if(!this->stack.empty()) {
+				auto [seen, node] = this->stack.head();
+				assert(seen && node);
+				auto target = Reverse ? node->left : node->right;
+				this->stack = Stack(std::make_pair(false, target), this->stack.tail());
 				this->advance();
 			}
 			return *this;
@@ -399,8 +396,11 @@ struct SortedMap {
 		constexpr Iterator operator ++(int)
 			{ Iterator copy(*this); ++*this; return copy; }
 
-		constexpr const Value& operator *() const
-			{ return std::get<Value>(*std::get<NodePtr>(this->stack.head())); }
+		constexpr value_type operator *() const {
+			auto& [seen, node] = this->stack.head();
+			assert(seen && node);
+			return std::make_pair(node->key, node->value);
+		}
 
 		constexpr bool operator ==(const Iterator& that) const
 			{ return this->stack == that.stack; }
@@ -427,13 +427,10 @@ struct SortedMap {
 
 };
 
-template struct SortedMap<int, bool>;
-
 }
 
-// template<typename Value, typename Allocator>
-// struct std::hash<pyrsistent::SortedMap<Value, Allocator>>
-	// : public pyrsistent::HashIterable<pyrsistent::SortedMap<Value, Allocator>> { };
+template<typename Key, typename Value, typename Allocator>
+struct std::hash<pyrsistent::SortedMap<Key, Value, Allocator>>
+	: public pyrsistent::HashIterable<pyrsistent::SortedMap<Key, Value, Allocator>> { };
 
 template struct pyrsistent::SortedMap<int, int>;
-
